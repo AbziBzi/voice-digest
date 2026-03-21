@@ -13,3 +13,6 @@ Early research / prototyping.
 - Keep secrets out of the repo
 - Prefer practical and low-cost solutions
 - Treat this like a real product project: notes, commits, experiments, iteration
+
+## Attribution test
+This commit exists to validate assistant-vs-human git attribution in the repo history.
