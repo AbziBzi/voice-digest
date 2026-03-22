@@ -9,21 +9,42 @@ Build a practical listening-first reading experience for high-signal AI/software
 Early research / prototyping.
 
 ## Prototype
-Small first useful prototype: a dependency-free Python CLI that can turn a short digest text into MP3 via ElevenLabs.
+Small first useful prototype: a dependency-free Python path that can turn a short digest text into a spoken-friendly script and then into MP3 via ElevenLabs.
 
-Script:
+Scripts:
+- `scripts/voice_digest_prepare.py`
 - `scripts/voice_digest_tts.py`
+- `scripts/voice_digest_pipeline.py`
 
-What it does:
-- reads digest text from `stdin` or `--input`
-- writes an MP3 to `--output` when `ELEVENLABS_API_KEY` is present
-- falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
+What they do:
+- `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
+- `voice_digest_tts.py` renders text to MP3 when `ELEVENLABS_API_KEY` is present
+- `voice_digest_pipeline.py` runs both steps in one command and writes both the spoken script artifact and MP3
+- the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
 - put generated audio and dry-run artifacts under `out/`
 - `out/` is treated as disposable and is ignored by git except for a placeholder file
 
 Usage:
+
+Prepare a spoken script only:
+
+```bash
+python3 scripts/voice_digest_prepare.py \
+  --input sample_digest.txt \
+  --output out/digest.spoken.txt
+```
+
+Run the full pipeline:
+
+```bash
+python3 scripts/voice_digest_pipeline.py \
+  --input sample_digest.txt \
+  --output out/digest.mp3
+```
+
+TTS only:
 
 ```bash
 python3 scripts/voice_digest_tts.py \
@@ -38,7 +59,7 @@ printf 'Short digest for audio.\n' | python3 scripts/voice_digest_tts.py --outpu
 Dry run without hitting the API:
 
 ```bash
-python3 scripts/voice_digest_tts.py \
+python3 scripts/voice_digest_pipeline.py \
   --input sample_digest.txt \
   --output out/digest.mp3 \
   --dry-run
