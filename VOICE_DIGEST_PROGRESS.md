@@ -27,3 +27,7 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Dry-run verification passed with `sample_digest.txt`, producing one inspectable run bundle under `out/runs/`.
 - Learned: a manifest-backed run folder is a better contract for cron and morning handoff than loose output filenames.
 - Next step: call the run wrapper from the real morning scheduler and confirm downstream delivery/inspection behavior.
+- Added `scripts/voice_digest_from_latest.py`, a scheduler-oriented entrypoint that selects the newest matching digest text file from a directory and feeds it into the existing run bundler.
+- Dry-run verification passed against a temp `incoming/` directory with two digest files; the script correctly selected the newer file and produced a complete run bundle with `digest.txt`, `spoken.txt`, `digest.mp3.dry-run.txt`, and `manifest.json`.
+- Learned: the cleanest near-term scheduler contract is now "drop digest text files into a directory, then let the voice job pick the newest one" instead of hardcoding a single source filename.
+- Next step: point a real morning cron/job at this entrypoint and validate audio delivery or retrieval in Edwin's actual morning flow.

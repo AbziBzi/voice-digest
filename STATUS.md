@@ -11,7 +11,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 
 ## Current gap
-The project can now bundle a digest run into a dated artifact folder with a manifest, but the full morning path is not yet wired so Edwin reliably receives a good spoken digest automatically.
+The project can now bundle a digest run into a dated artifact folder with a manifest, and it now has a scheduler-safe entrypoint for selecting the newest digest text file from a drop directory. The full morning path is still not yet wired so Edwin reliably receives a good spoken digest automatically.
 
 ## Overnight operating model
 - Scheduler-driven bounded phases
@@ -27,4 +27,4 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 5. Add a morning summary that reports overnight repo progress clearly.
 
 ## Immediate next step
-Use the new run bundle in a real scheduled job, then validate the cleanest delivery path for the generated audio artifact.
+Point a real scheduled job at the new `voice_digest_from_latest.py` entrypoint, then validate the cleanest delivery path for the generated audio artifact.
