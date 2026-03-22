@@ -15,11 +15,13 @@ Scripts:
 - `scripts/voice_digest_prepare.py`
 - `scripts/voice_digest_tts.py`
 - `scripts/voice_digest_pipeline.py`
+- `scripts/voice_digest_run.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
 - `voice_digest_tts.py` renders text to MP3 when `ELEVENLABS_API_KEY` is present
 - `voice_digest_pipeline.py` runs both steps in one command and writes both the spoken script artifact and MP3
+- `voice_digest_run.py` creates a dated run folder with copied input, spoken script, audio or dry-run note, and a JSON manifest
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -64,6 +66,20 @@ python3 scripts/voice_digest_pipeline.py \
   --output out/digest.mp3 \
   --dry-run
 ```
+
+Create one scheduler-friendly run bundle:
+
+```bash
+python3 scripts/voice_digest_run.py \
+  --input sample_digest.txt \
+  --dry-run
+```
+
+This writes a run folder under `out/runs/YYYY-MM-DD/RUN_ID/` containing:
+- `digest.txt`
+- `spoken.txt`
+- `digest.mp3` or `digest.mp3.dry-run.txt`
+- `manifest.json`
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis

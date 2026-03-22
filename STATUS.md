@@ -8,9 +8,10 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - ElevenLabs synthesis works locally via `scripts/voice_digest_tts.py`.
 - Spoken-script preparation works via `scripts/voice_digest_prepare.py`.
 - Combined script + TTS flow works via `scripts/voice_digest_pipeline.py`.
+- Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 
 ## Current gap
-The project can produce audio artifacts, but the full morning path is not yet wired so Edwin reliably receives a good spoken digest automatically.
+The project can now bundle a digest run into a dated artifact folder with a manifest, but the full morning path is not yet wired so Edwin reliably receives a good spoken digest automatically.
 
 ## Overnight operating model
 - Scheduler-driven bounded phases
@@ -26,4 +27,4 @@ The project can produce audio artifacts, but the full morning path is not yet wi
 5. Add a morning summary that reports overnight repo progress clearly.
 
 ## Immediate next step
-Use overnight runs to turn the current prototype into a scheduler-friendly workflow with better checkpoints and clearer morning reporting.
+Use the new run bundle in a real scheduled job, then validate the cleanest delivery path for the generated audio artifact.

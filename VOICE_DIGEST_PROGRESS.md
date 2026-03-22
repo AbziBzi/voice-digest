@@ -23,3 +23,7 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Dry-run verification passed end-to-end: the pipeline wrote `out/sample_pipeline.spoken.txt` and `out/sample_pipeline.mp3.dry-run.txt` from `sample_digest.txt`.
 - Learned: the right near-term product shape is probably not "read the whole digest verbatim", but "prepare a short spoken brief first, then synthesize that curated script."
 - Next step: wire the morning digest flow so the scheduled digest can emit a concise spoken version automatically.
+- Added `scripts/voice_digest_run.py`, a thin scheduler-oriented wrapper that creates a dated run directory with copied digest input, `spoken.txt`, audio or dry-run note, and `manifest.json`.
+- Dry-run verification passed with `sample_digest.txt`, producing one inspectable run bundle under `out/runs/`.
+- Learned: a manifest-backed run folder is a better contract for cron and morning handoff than loose output filenames.
+- Next step: call the run wrapper from the real morning scheduler and confirm downstream delivery/inspection behavior.
