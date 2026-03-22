@@ -92,6 +92,8 @@ This writes a run folder under `out/runs/YYYY-MM-DD/RUN_ID/` containing:
 - `digest.mp3` or `digest.mp3.dry-run.txt`
 - `manifest.json`
 
+And the scheduler wrapper writes a stable JSON handoff file like `out/latest_run.json` with the selected input path, run directory, manifest path, spoken script path, audio path, dry-run note path when present, and mode (`live` or `dry-run`).
+
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis
 - `ELEVENLABS_VOICE_ID` to override the default voice
@@ -114,3 +116,4 @@ Notes:
 
 ## Attribution test
 This commit exists to validate assistant-vs-human git attribution in the repo history.
+ attribution in the repo history.
