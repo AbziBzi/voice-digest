@@ -2,17 +2,20 @@
 
 ## Commit attribution
 
-Assistant-authored commits in this repo now use a GitHub-visible Codex identity:
+Current temporary setup in this repo uses a GitHub-visible Codex identity:
 
 - Name: `Codex`
 - Email: `codex@openai.com`
 
-Reason:
-- keeps assistant commits distinguishable from Edwin's
-- makes Codex-authored commits show up cleanly in GitHub UI instead of using a hidden `.invalid` placeholder
-- matches the current coding harness for this project
+But the intended long-term policy is slightly different:
+- assistant-driven commits should be clearly connected to Edwin as the initiating human
+- assistant identity should still be visible in GitHub history
+- for Codex-driven work, the preferred shape is: Edwin as author plus a visible `Co-authored-by: Codex <codex@openai.com>` trailer
+- for other harnesses, use the same pattern with the appropriate visible assistant identity where possible
 
-If a different coding harness becomes the primary author later, update the repo-local git identity to match that harness.
+This keeps ownership clear while still preserving which agent contributed.
+
+The repo-local identity/config should be updated to match that policy as part of the broader assistant commit-attribution setup.
 
 ## Overnight workflow
 

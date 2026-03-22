@@ -28,3 +28,6 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 
 ## Immediate next step
 Point a real scheduled job at the new `voice_digest_from_latest.py` entrypoint, then validate the cleanest delivery path for the generated audio artifact.
+
+## Follow-up note
+Tomorrow's daytime maintenance should also finalize the assistant commit-attribution policy so assistant-originated commits are co-authored in a way that keeps Edwin visible as initiator while showing the specific agent identity.
