@@ -2,20 +2,17 @@
 
 ## Commit attribution
 
-For now, assistant-authored commits in this repo use a distinct git author identity:
+Assistant-authored commits in this repo now use a GitHub-visible Codex identity:
 
-- Name: `Leslie`
-- Email: placeholder under reserved `.invalid`
+- Name: `Codex`
+- Email: `codex@openai.com`
 
 Reason:
 - keeps assistant commits distinguishable from Edwin's
-- avoids using Edwin's personal email for assistant-made commits
-- avoids pretending the commits belong to a separate GitHub account that does not exist
+- makes Codex-authored commits show up cleanly in GitHub UI instead of using a hidden `.invalid` placeholder
+- matches the current coding harness for this project
 
-Tradeoff:
-- GitHub will not attribute these commits to a separate profile/contribution graph
-
-If cleaner public attribution is wanted later, create a dedicated GitHub identity for Leslie and switch to that account's noreply email.
+If a different coding harness becomes the primary author later, update the repo-local git identity to match that harness.
 
 ## Overnight workflow
 
