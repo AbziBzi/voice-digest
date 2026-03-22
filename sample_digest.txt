@@ -1,0 +1,5 @@
+Today in AI tooling: teams are collapsing multi-step workflows into smaller, reliable automations.
+
+Why it matters: the strongest leverage is often not a bigger model, but faster iteration with fewer manual handoffs.
+
+Worth opening later: any article with a benchmark chart or architecture diagram.
