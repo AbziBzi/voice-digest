@@ -35,3 +35,7 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Dry-run verification passed against a temp `incoming/` directory: the scheduler job selected the newest digest, created a complete run bundle, and wrote a state file with the run directory, manifest path, spoken script path, audio path, dry-run note path, and run mode.
 - Learned: the cleanest next integration contract is now "upstream digest drops text, scheduler job creates the audio bundle, downstream delivery reads `latest_run.json`".
 - Next step: wire a real morning scheduler invocation to this wrapper, then validate how Signal/OpenClaw should deliver or surface the resulting audio artifact.
+- Added `scripts/voice_digest_validate_latest.py`, a small readiness check that validates `out/latest_run.json`, the referenced manifest, and artifact consistency before downstream delivery tries to use them.
+- Dry-run verification passed end-to-end: a temp scheduler job wrote `out/test-latest-run.json`, and the validator accepted it in `dry-run` mode while checking the manifest, spoken script, and dry-run note paths.
+- Learned: the downstream contract is now strong enough to fail fast with a clear reason instead of discovering a broken handoff only at delivery time.
+- Next step: wire the real scheduler job and then build or test the delivery consumer that reads validated latest-run state.

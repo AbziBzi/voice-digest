@@ -11,7 +11,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 
 ## Current gap
-The project can now bundle a digest run into a dated artifact folder with a manifest, and it now has a scheduler-safe entrypoint for selecting the newest digest text file from a drop directory. The full morning path is still not yet wired so Edwin reliably receives a good spoken digest automatically.
+The project can now bundle a digest run into a dated artifact folder with a manifest, select the newest digest text file from a drop directory, and validate the stable `latest_run.json` handoff before downstream delivery. The full morning path is still not yet wired so Edwin reliably receives a good spoken digest automatically.
 
 ## Overnight operating model
 - Scheduler-driven bounded phases
@@ -27,7 +27,7 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 5. Add a morning summary that reports overnight repo progress clearly.
 
 ## Immediate next step
-Point a real scheduled job at `voice_digest_scheduler_job.py`, then validate the cleanest delivery path for the generated audio artifact using the stable `latest_run.json` handoff file.
+Point a real scheduled job at `voice_digest_scheduler_job.py`, then add or validate the downstream delivery step that consumes the now-checkable `latest_run.json` handoff file.
 
 ## Follow-up note
 Tomorrow's daytime maintenance should also finalize the assistant commit-attribution policy so assistant-originated commits are co-authored in a way that keeps Edwin visible as initiator while showing the specific agent identity.

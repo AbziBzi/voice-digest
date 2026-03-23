@@ -17,6 +17,8 @@ Scripts:
 - `scripts/voice_digest_pipeline.py`
 - `scripts/voice_digest_run.py`
 - `scripts/voice_digest_from_latest.py`
+- `scripts/voice_digest_scheduler_job.py`
+- `scripts/voice_digest_validate_latest.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -24,6 +26,8 @@ What they do:
 - `voice_digest_pipeline.py` runs both steps in one command and writes both the spoken script artifact and MP3
 - `voice_digest_run.py` creates a dated run folder with copied input, spoken script, audio or dry-run note, and a JSON manifest
 - `voice_digest_from_latest.py` finds the newest matching digest text file in a directory and feeds it into the run bundler for scheduler use
+- `voice_digest_scheduler_job.py` adds a stable `out/latest_run.json` handoff file for downstream delivery
+- `voice_digest_validate_latest.py` validates that `out/latest_run.json`, the manifest, and the referenced artifacts all agree before delivery
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -93,6 +97,12 @@ This writes a run folder under `out/runs/YYYY-MM-DD/RUN_ID/` containing:
 - `manifest.json`
 
 And the scheduler wrapper writes a stable JSON handoff file like `out/latest_run.json` with the selected input path, run directory, manifest path, spoken script path, audio path, dry-run note path when present, and mode (`live` or `dry-run`).
+
+You can validate that handoff before delivery with:
+
+```bash
+python3 scripts/voice_digest_validate_latest.py
+```
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis
