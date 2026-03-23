@@ -46,3 +46,7 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Dry-run verification passed end-to-end: a temp scheduler job selected the newest digest, the validator accepted the generated `latest_run.json`, and the new payload script emitted a delivery-ready JSON summary with artifact paths and a spoken preview.
 - Learned: the next integration contract is now stable enough for a notifier to remain thin, because live vs dry-run branching can be decided from one validated payload instead of re-reading multiple files.
 - Next step: connect a real notifier or Signal/OpenClaw bridge to this payload and test one actual morning delivery path.
+- Added `scripts/voice_digest_checkpoint.py`, a small overnight handoff helper that reports git branch/head, working-tree cleanliness, the latest progress entry, and validated latest-run details when `out/latest_run.json` exists.
+- Verification passed in both text and JSON modes: the checkpoint script reported the repo state cleanly before commit and included the expected latest progress section without requiring a live delivery path.
+- Learned: the delivery hop is still the risky integration boundary, so a project-local checkpoint is a good bounded milestone because it improves morning visibility without pretending Signal/OpenClaw audio sending is solved.
+- Next step: either feed the checkpoint output into the morning digest handoff or move on to a thin notifier bridge once the cleanest delivery mechanism is confirmed.

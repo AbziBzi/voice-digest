@@ -11,7 +11,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 
 ## Current gap
-The project can now bundle a digest run into a dated artifact folder with a manifest, select the newest digest text file from a drop directory, validate the stable `latest_run.json` handoff, and emit a delivery-ready payload for a notifier to consume in live vs dry-run mode. The full morning path is still not yet wired so Edwin reliably receives a good spoken digest automatically.
+The project can now bundle a digest run into a dated artifact folder with a manifest, select the newest digest text file from a drop directory, validate the stable `latest_run.json` handoff, emit a delivery-ready payload for a notifier to consume in live vs dry-run mode, and generate a compact overnight checkpoint that summarizes repo state plus latest-run readiness. The full morning path is still not yet wired so Edwin reliably receives a good spoken digest automatically.
 
 ## Overnight operating model
 - Scheduler-driven bounded phases
@@ -20,14 +20,14 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 - Morning handoff should say what changed, what works, and what is next
 
 ## Next milestone candidates
-1. Add a project-local checkpoint script / status updater for overnight runs.
+1. Connect the checkpoint output into the morning digest / overnight handoff path.
 2. Create a robust spoken-digest format for the real morning digest output.
 3. Wire a safe scheduled job that can create the spoken artifact from the morning digest text.
 4. Validate the cleanest delivery path for morning audio on Signal/OpenClaw.
 5. Add a morning summary that reports overnight repo progress clearly.
 
 ## Immediate next step
-Point a real scheduled job at `voice_digest_scheduler_job.py`, then wire a notifier or Signal/OpenClaw bridge that consumes `voice_digest_delivery_payload.py` output and actually sends the live artifact or dry-run fallback.
+Point a real scheduled job at `voice_digest_scheduler_job.py`, optionally capture `voice_digest_checkpoint.py` output for morning handoff visibility, then wire a notifier or Signal/OpenClaw bridge that consumes `voice_digest_delivery_payload.py` output and actually sends the live artifact or dry-run fallback.
 
 ## Follow-up note
 Tomorrow's daytime maintenance should also finalize the assistant commit-attribution policy so assistant-originated commits are co-authored in a way that keeps Edwin visible as initiator while showing the specific agent identity.
