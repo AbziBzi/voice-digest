@@ -39,3 +39,10 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Dry-run verification passed end-to-end: a temp scheduler job wrote `out/test-latest-run.json`, and the validator accepted it in `dry-run` mode while checking the manifest, spoken script, and dry-run note paths.
 - Learned: the downstream contract is now strong enough to fail fast with a clear reason instead of discovering a broken handoff only at delivery time.
 - Next step: wire the real scheduler job and then build or test the delivery consumer that reads validated latest-run state.
+
+### 2026-03-23
+- Added `scripts/voice_digest_delivery_payload.py`, a downstream consumer that validates `latest_run.json` and emits a notifier-ready JSON payload with explicit `send_audio` vs `send_text_fallback` behavior.
+- Refactored `scripts/voice_digest_validate_latest.py` to expose reusable validation data so downstream consumers can share the same handoff checks instead of reimplementing them.
+- Dry-run verification passed end-to-end: a temp scheduler job selected the newest digest, the validator accepted the generated `latest_run.json`, and the new payload script emitted a delivery-ready JSON summary with artifact paths and a spoken preview.
+- Learned: the next integration contract is now stable enough for a notifier to remain thin, because live vs dry-run branching can be decided from one validated payload instead of re-reading multiple files.
+- Next step: connect a real notifier or Signal/OpenClaw bridge to this payload and test one actual morning delivery path.

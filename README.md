@@ -19,6 +19,7 @@ Scripts:
 - `scripts/voice_digest_from_latest.py`
 - `scripts/voice_digest_scheduler_job.py`
 - `scripts/voice_digest_validate_latest.py`
+- `scripts/voice_digest_delivery_payload.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -28,6 +29,7 @@ What they do:
 - `voice_digest_from_latest.py` finds the newest matching digest text file in a directory and feeds it into the run bundler for scheduler use
 - `voice_digest_scheduler_job.py` adds a stable `out/latest_run.json` handoff file for downstream delivery
 - `voice_digest_validate_latest.py` validates that `out/latest_run.json`, the manifest, and the referenced artifacts all agree before delivery
+- `voice_digest_delivery_payload.py` validates `out/latest_run.json` and emits a notifier-ready JSON payload that tells a downstream sender what to deliver in `live` vs `dry-run` mode
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -102,6 +104,12 @@ You can validate that handoff before delivery with:
 
 ```bash
 python3 scripts/voice_digest_validate_latest.py
+```
+
+And you can emit a delivery-ready payload for a notifier with:
+
+```bash
+python3 scripts/voice_digest_delivery_payload.py
 ```
 
 Optional environment variables:
