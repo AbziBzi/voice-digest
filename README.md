@@ -21,6 +21,7 @@ Scripts:
 - `scripts/voice_digest_validate_latest.py`
 - `scripts/voice_digest_delivery_payload.py`
 - `scripts/voice_digest_checkpoint.py`
+- `scripts/voice_digest_morning_handoff.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -32,6 +33,7 @@ What they do:
 - `voice_digest_validate_latest.py` validates that `out/latest_run.json`, the manifest, and the referenced artifacts all agree before delivery
 - `voice_digest_delivery_payload.py` validates `out/latest_run.json` and emits a notifier-ready JSON payload that tells a downstream sender what to deliver in `live` vs `dry-run` mode
 - `voice_digest_checkpoint.py` emits a compact overnight checkpoint with git state, the latest progress entry, and latest-run validation when a handoff file exists
+- `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -118,6 +120,12 @@ For an overnight handoff / checkpoint summary:
 
 ```bash
 python3 scripts/voice_digest_checkpoint.py
+```
+
+For one combined morning-ready handoff:
+
+```bash
+python3 scripts/voice_digest_morning_handoff.py
 ```
 
 Optional environment variables:

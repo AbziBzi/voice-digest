@@ -50,3 +50,7 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Verification passed in both text and JSON modes: the checkpoint script reported the repo state cleanly before commit and included the expected latest progress section without requiring a live delivery path.
 - Learned: the delivery hop is still the risky integration boundary, so a project-local checkpoint is a good bounded milestone because it improves morning visibility without pretending Signal/OpenClaw audio sending is solved.
 - Next step: either feed the checkpoint output into the morning digest handoff or move on to a thin notifier bridge once the cleanest delivery mechanism is confirmed.
+- Added `scripts/voice_digest_morning_handoff.py`, a small morning-readiness wrapper that combines the overnight checkpoint and the validated delivery payload into one concise text or JSON handoff.
+- Verification passed in both states: the new script reported a clear "no latest_run.json yet" next action, and after a temp dry-run scheduler run it emitted a delivery-ready handoff with selected input, artifact paths, and spoken preview.
+- Learned: the morning summary no longer needs to re-stitch repo state and delivery readiness from multiple scripts, which makes the next notifier/scheduler integration thinner.
+- Next step: point a real morning automation or notifier at `voice_digest_morning_handoff.py`, then test one true end-to-end delivery path.
