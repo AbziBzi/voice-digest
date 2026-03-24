@@ -23,6 +23,7 @@ Scripts:
 - `scripts/voice_digest_checkpoint.py`
 - `scripts/voice_digest_morning_handoff.py`
 - `scripts/voice_digest_morning_job.py`
+- `scripts/voice_digest_openclaw_notifier.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -36,6 +37,7 @@ What they do:
 - `voice_digest_checkpoint.py` emits a compact overnight checkpoint with git state, the latest progress entry, and latest-run validation when a handoff file exists
 - `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff
 - `voice_digest_morning_job.py` runs the scheduler flow end-to-end and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for a cron job or notifier to consume
+- `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -143,6 +145,33 @@ By default this writes:
 - `out/morning_handoff.txt`
 - `out/morning_handoff.json`
 - `out/delivery_payload.json`
+
+To bridge that into OpenClaw messaging in preview mode:
+
+```bash
+python3 scripts/voice_digest_openclaw_notifier.py \
+  --channel signal \
+  --target +37060000000
+```
+
+To verify the real OpenClaw send path without delivering a message:
+
+```bash
+python3 scripts/voice_digest_openclaw_notifier.py \
+  --channel signal \
+  --target +37060000000 \
+  --send \
+  --openclaw-dry-run
+```
+
+And to actually send the morning digest once the target is confirmed:
+
+```bash
+python3 scripts/voice_digest_openclaw_notifier.py \
+  --channel signal \
+  --target +37060000000 \
+  --send
+```
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis
