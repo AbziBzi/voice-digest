@@ -22,6 +22,7 @@ Scripts:
 - `scripts/voice_digest_delivery_payload.py`
 - `scripts/voice_digest_checkpoint.py`
 - `scripts/voice_digest_morning_handoff.py`
+- `scripts/voice_digest_morning_job.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -34,6 +35,7 @@ What they do:
 - `voice_digest_delivery_payload.py` validates `out/latest_run.json` and emits a notifier-ready JSON payload that tells a downstream sender what to deliver in `live` vs `dry-run` mode
 - `voice_digest_checkpoint.py` emits a compact overnight checkpoint with git state, the latest progress entry, and latest-run validation when a handoff file exists
 - `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff
+- `voice_digest_morning_job.py` runs the scheduler flow end-to-end and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for a cron job or notifier to consume
 - the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
 
 Convention:
@@ -127,6 +129,20 @@ For one combined morning-ready handoff:
 ```bash
 python3 scripts/voice_digest_morning_handoff.py
 ```
+
+For one scheduler-friendly morning job that also writes stable handoff/payload files:
+
+```bash
+python3 scripts/voice_digest_morning_job.py \
+  --input-dir incoming_digests \
+  --dry-run
+```
+
+By default this writes:
+- `out/latest_run.json`
+- `out/morning_handoff.txt`
+- `out/morning_handoff.json`
+- `out/delivery_payload.json`
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis

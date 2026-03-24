@@ -54,3 +54,9 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Verification passed in both states: the new script reported a clear "no latest_run.json yet" next action, and after a temp dry-run scheduler run it emitted a delivery-ready handoff with selected input, artifact paths, and spoken preview.
 - Learned: the morning summary no longer needs to re-stitch repo state and delivery readiness from multiple scripts, which makes the next notifier/scheduler integration thinner.
 - Next step: point a real morning automation or notifier at `voice_digest_morning_handoff.py`, then test one true end-to-end delivery path.
+
+### 2026-03-24
+- Added `scripts/voice_digest_morning_job.py`, a scheduler-friendly wrapper that runs the latest-digest selection + run bundle step and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for downstream automation.
+- Dry-run verification passed end-to-end against a temp incoming digest directory: the new morning job selected the newest digest, created a run bundle, wrote `latest_run.json`, and emitted the stable handoff/payload files with delivery-ready content.
+- Learned: the cleanest next integration contract is now a single job invocation that leaves stable files for a notifier or OpenClaw bridge, instead of requiring cron to chain multiple scripts itself.
+- Next step: wire a real Signal/OpenClaw notifier to consume `out/delivery_payload.json` and/or `out/morning_handoff.txt`, then test one true end-to-end morning delivery path.
