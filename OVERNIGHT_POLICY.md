@@ -15,6 +15,7 @@ Purpose: let the voice-digest project make real progress overnight without drift
 - Retry budget: at most 2 retries for transient failures per step.
 - Scope budget: stop if the diff becomes broader than the current milestone.
 - Cost mindset: choose practical, dependency-light steps unless a larger spend is clearly justified.
+- Provider-cost mindset: because Edwin is on the ElevenLabs free tier, reduce dependency on ElevenLabs-only success paths and prioritize OpenAI TTS fallback work when quota pressure is relevant.
 
 ## Milestone shape
 Each overnight run should do one bounded slice:

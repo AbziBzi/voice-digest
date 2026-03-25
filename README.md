@@ -8,6 +8,17 @@ Build a practical listening-first reading experience for high-signal AI/software
 ## Current status
 Early research / prototyping.
 
+## Provider direction
+Current provider strategy for this project:
+- primary: ElevenLabs
+- first fallback: OpenAI TTS
+- final safe fallback: dry-run text note until more providers are wired
+
+Reason for this policy:
+- Edwin is currently on the ElevenLabs free tier, so quota/rate limits are a real operational blocker
+- `OPENAI_API_KEY` is already available in the environment
+- scheduled workers should therefore treat OpenAI fallback support as an active implementation target
+
 ## Prototype
 Small first useful prototype: a dependency-free Python path that can turn a short digest text into a spoken-friendly script and then into MP3 via ElevenLabs.
 
@@ -24,6 +35,7 @@ Scripts:
 - `scripts/voice_digest_morning_handoff.py`
 - `scripts/voice_digest_morning_job.py`
 - `scripts/voice_digest_openclaw_notifier.py`
+- `scripts/voice_digest_dispatch_job.py`
 
 What they do:
 - `voice_digest_prepare.py` turns a text digest into a spoken script with intro/outro and explicit `VISUAL FLAG:` markers
@@ -38,7 +50,8 @@ What they do:
 - `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff
 - `voice_digest_morning_job.py` runs the scheduler flow end-to-end and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for a cron job or notifier to consume
 - `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode
-- the TTS step falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt` when the key is missing or `--dry-run` is used
+- `voice_digest_dispatch_job.py` runs the morning job plus notifier together and always writes stable `delivery_status.json` and `delivery_status.txt` files so cron can tell whether the send path succeeded or where it failed
+- the TTS step prefers ElevenLabs, falls back to OpenAI TTS when ElevenLabs credentials/availability are the blocker, and only then falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt`
 
 Convention:
 - put generated audio and dry-run artifacts under `out/`
@@ -187,6 +200,21 @@ And to actually send the morning digest once the target is confirmed:
 python3 scripts/voice_digest_openclaw_notifier.py \
   --send
 ```
+
+For one scheduler-facing command that builds the morning artifacts, exercises the notifier, and leaves stable delivery-status files behind:
+
+```bash
+python3 scripts/voice_digest_dispatch_job.py \
+  --input-dir incoming_digests \
+  --send \
+  --openclaw-dry-run
+```
+
+By default this also writes:
+- `out/delivery_status.json`
+- `out/delivery_status.txt`
+
+`delivery_status.json` records whether the failure happened in the morning build or notifier stage, plus the selected input, mode, destination when known, and the stable artifact paths a scheduler can inspect.
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis

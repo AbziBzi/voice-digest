@@ -36,4 +36,18 @@ The morning notifier can now get its OpenClaw destination from any of these sour
 Recommended morning-run shape:
 - keep the real destination out of committed docs/scripts
 - set env vars in the scheduler environment or provision `.voice_digest_notifier.json` locally
+- use `scripts/voice_digest_dispatch_job.py` as the scheduler entrypoint once the destination is wired, because it writes stable delivery status artifacts for success and failure
 - use `--openclaw-dry-run` for the first end-to-end send-path verification before one true live delivery
+
+## TTS provider policy
+
+The intended provider order for this project is:
+1. ElevenLabs as the primary premium voice path
+2. OpenAI TTS as the first fallback when ElevenLabs quota, free-tier limits, or transient provider issues block synthesis
+3. dry-run note output as the safe final fallback until additional providers are wired
+
+Important operating assumptions:
+- `OPENAI_API_KEY` is already available in the environment and should be preferred over asking Edwin for another OpenAI key
+- scheduled workers should treat OpenAI fallback support as a real project requirement, not a speculative idea
+- if ElevenLabs fails for quota/capacity reasons, the next best milestone is usually OpenAI fallback wiring rather than more ElevenLabs-only polish
+- future fallback providers like AWS Polly, Google Cloud TTS, or a local model can be added later, but OpenAI is the current planned fallback target
