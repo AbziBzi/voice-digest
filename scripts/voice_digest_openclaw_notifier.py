@@ -16,6 +16,7 @@ DEFAULT_HANDOFF_TEXT_PATH = REPO_ROOT / "out" / "morning_handoff.txt"
 DEFAULT_CONFIG_PATH = REPO_ROOT / ".voice_digest_notifier.json"
 DEFAULT_CHANNEL_ENV = "VOICE_DIGEST_OPENCLAW_CHANNEL"
 DEFAULT_TARGET_ENV = "VOICE_DIGEST_OPENCLAW_TARGET"
+DEFAULT_AUDIO_MESSAGE_MODE_ENV = "VOICE_DIGEST_AUDIO_MESSAGE_MODE"
 
 
 def parse_args() -> argparse.Namespace:
@@ -58,6 +59,16 @@ def parse_args() -> argparse.Namespace:
         help=(
             "Optional JSON config file with `channel` and `target` fields. "
             "CLI args win over env vars, which win over config file."
+        ),
+    )
+    parser.add_argument(
+        "--audio-message-mode",
+        choices=["full", "caption"],
+        default=os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV, "full"),
+        help=(
+            "How to build the message body when sending live audio. `full` sends the whole morning handoff, "
+            "while `caption` sends a shorter summary. Defaults to $"
+            f"{DEFAULT_AUDIO_MESSAGE_MODE_ENV} or full."
         ),
     )
     parser.add_argument(
@@ -126,7 +137,42 @@ def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> 
     return channel, target, source
 
 
-def build_message_plan(payload: dict[str, object], handoff_text: str, channel: str, target: str, destination_source: str) -> dict[str, object]:
+def build_audio_caption(payload: dict[str, object]) -> str:
+    run = payload.get("run")
+    summary = payload.get("summary")
+    if not isinstance(run, dict) or not isinstance(summary, dict):
+        raise ValueError("payload missing run/summary for audio caption")
+
+    selected_input = run.get("selected_input")
+    spoken_preview = summary.get("spoken_preview")
+    source_digest = summary.get("source_digest")
+
+    if not isinstance(selected_input, str) or not selected_input.strip():
+        raise ValueError("payload missing run.selected_input for audio caption")
+    if not isinstance(spoken_preview, str) or not spoken_preview.strip():
+        raise ValueError("payload missing summary.spoken_preview for audio caption")
+
+    caption_lines = [
+        "Voice digest is ready.",
+        f"Input: {selected_input}",
+    ]
+    if isinstance(source_digest, str) and source_digest.strip():
+        caption_lines.append(f"Source: {source_digest}")
+    caption_lines.extend([
+        "Preview:",
+        spoken_preview,
+    ])
+    return "\n".join(caption_lines)
+
+
+def build_message_plan(
+    payload: dict[str, object],
+    handoff_text: str,
+    channel: str,
+    target: str,
+    destination_source: str,
+    audio_message_mode: str,
+) -> dict[str, object]:
     notifier_action = payload.get("notifier_action")
     delivery_kind = payload.get("delivery_kind")
     delivery_target = payload.get("delivery_target")
@@ -151,8 +197,12 @@ def build_message_plan(payload: dict[str, object], handoff_text: str, channel: s
         target,
     ]
 
+    message_text = handoff_text
+    if notifier_action == "send_audio" and audio_message_mode == "caption":
+        message_text = build_audio_caption(payload)
+
     if notifier_action == "send_audio":
-        command.extend(["--message", handoff_text, "--media", delivery_target])
+        command.extend(["--message", message_text, "--media", delivery_target])
     elif notifier_action == "send_text_fallback":
         fallback_note = load_text(Path(delivery_target))
         message_text = f"{handoff_text}\n\nTTS status: dry run fallback\n{fallback_note}"
@@ -168,6 +218,7 @@ def build_message_plan(payload: dict[str, object], handoff_text: str, channel: s
         "notifier_action": notifier_action,
         "delivery_kind": delivery_kind,
         "delivery_target": delivery_target,
+        "audio_message_mode": audio_message_mode,
         "command": command,
     }
 
@@ -195,7 +246,14 @@ def main() -> int:
         handoff_text = load_text(args.handoff_text_path)
         config = load_optional_config(args.config_path)
         channel, target, destination_source = resolve_destination(args, config)
-        plan = build_message_plan(payload, handoff_text, channel, target, destination_source)
+        plan = build_message_plan(
+            payload,
+            handoff_text,
+            channel,
+            target,
+            destination_source,
+            args.audio_message_mode,
+        )
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -211,6 +269,7 @@ def main() -> int:
             print(f"destination source: {plan['destination_source']}")
             print(f"action: {plan['notifier_action']}")
             print(f"delivery: {plan['delivery_kind']} -> {plan['delivery_target']}")
+            print(f"audio message mode: {plan['audio_message_mode']}")
             print("command:")
             print(render_preview(plan))
         return 0

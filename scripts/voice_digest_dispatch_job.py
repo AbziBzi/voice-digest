@@ -125,6 +125,11 @@ def parse_args() -> argparse.Namespace:
         help="Optional notifier config file path passed through to the notifier.",
     )
     parser.add_argument(
+        "--audio-message-mode",
+        choices=["full", "caption"],
+        help="Message-body mode passed through to the notifier for live audio sends.",
+    )
+    parser.add_argument(
         "--send",
         action="store_true",
         help="Actually invoke `openclaw message send`. Without this flag the notifier runs in preview mode.",
@@ -219,6 +224,8 @@ def build_notifier_command(args: argparse.Namespace) -> list[str]:
         command.extend(["--channel", args.channel])
     if args.target:
         command.extend(["--target", args.target])
+    if args.audio_message_mode:
+        command.extend(["--audio-message-mode", args.audio_message_mode])
     if args.send:
         command.append("--send")
     if args.openclaw_dry_run:
@@ -313,6 +320,7 @@ def build_base_status(args: argparse.Namespace, started_at: str) -> dict[str, An
             "send": args.send,
             "openclaw_dry_run": args.openclaw_dry_run,
             "tts_dry_run": args.dry_run,
+            "audio_message_mode": args.audio_message_mode or "full",
         },
         "commands": {},
     }

@@ -38,6 +38,7 @@ Recommended morning-run shape:
 - set env vars in the scheduler environment or provision `.voice_digest_notifier.json` locally
 - use `scripts/voice_digest_dispatch_job.py` as the scheduler entrypoint once the destination is wired, because it writes stable delivery status artifacts for success and failure
 - use `--openclaw-dry-run` for the first end-to-end send-path verification before one true live delivery
+- if the full morning handoff is too long for an attached-audio message body, pass `--audio-message-mode caption` (or set `VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption`) to send a shorter summary instead
 
 ## TTS provider policy
 

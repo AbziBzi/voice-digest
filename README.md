@@ -49,7 +49,7 @@ What they do:
 - `voice_digest_checkpoint.py` emits a compact overnight checkpoint with git state, the latest progress entry, and latest-run validation when a handoff file exists
 - `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff
 - `voice_digest_morning_job.py` runs the scheduler flow end-to-end and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for a cron job or notifier to consume
-- `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode
+- `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode, with support for either the full handoff text or a shorter caption as the live audio message body
 - `voice_digest_dispatch_job.py` runs the morning job plus notifier together and always writes stable `delivery_status.json` and `delivery_status.txt` files so cron can tell whether the send path succeeded or where it failed
 - the TTS step prefers ElevenLabs, falls back to OpenAI TTS when ElevenLabs credentials/availability are the blocker, and only then falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt`
 
@@ -201,6 +201,20 @@ python3 scripts/voice_digest_openclaw_notifier.py \
   --send
 ```
 
+If the attached-audio message body should be shorter than the full morning handoff, use caption mode:
+
+```bash
+python3 scripts/voice_digest_openclaw_notifier.py \
+  --send \
+  --audio-message-mode caption
+```
+
+Or set it once for the scheduler environment:
+
+```bash
+export VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption
+```
+
 For one scheduler-facing command that builds the morning artifacts, exercises the notifier, and leaves stable delivery-status files behind:
 
 ```bash
@@ -208,6 +222,16 @@ python3 scripts/voice_digest_dispatch_job.py \
   --input-dir incoming_digests \
   --send \
   --openclaw-dry-run
+```
+
+To test the shorter live-audio caption path through the full dispatch flow:
+
+```bash
+python3 scripts/voice_digest_dispatch_job.py \
+  --input-dir incoming_digests \
+  --send \
+  --openclaw-dry-run \
+  --audio-message-mode caption
 ```
 
 By default this also writes:
