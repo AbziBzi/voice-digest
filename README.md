@@ -154,12 +154,29 @@ python3 scripts/voice_digest_openclaw_notifier.py \
   --target +37060000000
 ```
 
+For cron-friendly use, you can also configure the destination once via env vars:
+
+```bash
+export VOICE_DIGEST_OPENCLAW_CHANNEL=signal
+export VOICE_DIGEST_OPENCLAW_TARGET=+37060000000
+python3 scripts/voice_digest_openclaw_notifier.py
+```
+
+Or via a repo-local config file at `.voice_digest_notifier.json`:
+
+```json
+{
+  "channel": "signal",
+  "target": "+37060000000"
+}
+```
+
+The notifier resolves the destination in this order: CLI args, then env vars, then config file.
+
 To verify the real OpenClaw send path without delivering a message:
 
 ```bash
 python3 scripts/voice_digest_openclaw_notifier.py \
-  --channel signal \
-  --target +37060000000 \
   --send \
   --openclaw-dry-run
 ```
@@ -168,8 +185,6 @@ And to actually send the morning digest once the target is confirmed:
 
 ```bash
 python3 scripts/voice_digest_openclaw_notifier.py \
-  --channel signal \
-  --target +37060000000 \
   --send
 ```
 

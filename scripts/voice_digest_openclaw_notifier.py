@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_PAYLOAD_PATH = REPO_ROOT / "out" / "delivery_payload.json"
 DEFAULT_HANDOFF_TEXT_PATH = REPO_ROOT / "out" / "morning_handoff.txt"
+DEFAULT_CONFIG_PATH = REPO_ROOT / ".voice_digest_notifier.json"
+DEFAULT_CHANNEL_ENV = "VOICE_DIGEST_OPENCLAW_CHANNEL"
+DEFAULT_TARGET_ENV = "VOICE_DIGEST_OPENCLAW_TARGET"
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,13 +39,26 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--channel",
-        required=True,
-        help="OpenClaw channel name, for example signal or telegram.",
+        help=(
+            "OpenClaw channel name, for example signal or telegram. "
+            f"Defaults to ${DEFAULT_CHANNEL_ENV} or config file when present."
+        ),
     )
     parser.add_argument(
         "--target",
-        required=True,
-        help="OpenClaw message target for the selected channel.",
+        help=(
+            "OpenClaw message target for the selected channel. "
+            f"Defaults to ${DEFAULT_TARGET_ENV} or config file when present."
+        ),
+    )
+    parser.add_argument(
+        "--config-path",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+        help=(
+            "Optional JSON config file with `channel` and `target` fields. "
+            "CLI args win over env vars, which win over config file."
+        ),
     )
     parser.add_argument(
         "--send",
@@ -68,6 +85,12 @@ def load_json(path: Path) -> dict[str, object]:
     return data
 
 
+def load_optional_config(path: Path) -> dict[str, object]:
+    if not path.exists():
+        return {}
+    return load_json(path)
+
+
 def load_text(path: Path) -> str:
     text = path.read_text(encoding="utf-8").strip()
     if not text:
@@ -75,7 +98,35 @@ def load_text(path: Path) -> str:
     return text
 
 
-def build_message_plan(payload: dict[str, object], handoff_text: str, channel: str, target: str) -> dict[str, object]:
+def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> tuple[str, str, str]:
+    config_channel = config.get("channel")
+    config_target = config.get("target")
+    env_channel = os.environ.get(DEFAULT_CHANNEL_ENV)
+    env_target = os.environ.get(DEFAULT_TARGET_ENV)
+
+    channel = args.channel or env_channel or (config_channel if isinstance(config_channel, str) else None)
+    target = args.target or env_target or (config_target if isinstance(config_target, str) else None)
+
+    if not channel or not target:
+        raise ValueError(
+            "destination is not configured; pass --channel/--target, set "
+            f"{DEFAULT_CHANNEL_ENV}/{DEFAULT_TARGET_ENV}, or write {args.config_path} with "
+            '{"channel": "signal", "target": "+370..."}'
+        )
+
+    source = "cli"
+    if not (args.channel and args.target):
+        if env_channel and env_target and channel == env_channel and target == env_target:
+            source = "env"
+        elif isinstance(config_channel, str) and isinstance(config_target, str) and channel == config_channel and target == config_target:
+            source = "config"
+        else:
+            source = "mixed"
+
+    return channel, target, source
+
+
+def build_message_plan(payload: dict[str, object], handoff_text: str, channel: str, target: str, destination_source: str) -> dict[str, object]:
     notifier_action = payload.get("notifier_action")
     delivery_kind = payload.get("delivery_kind")
     delivery_target = payload.get("delivery_target")
@@ -112,6 +163,7 @@ def build_message_plan(payload: dict[str, object], handoff_text: str, channel: s
     return {
         "channel": channel,
         "target": target,
+        "destination_source": destination_source,
         "mode": mode,
         "notifier_action": notifier_action,
         "delivery_kind": delivery_kind,
@@ -141,7 +193,9 @@ def main() -> int:
     try:
         payload = load_json(args.payload_path)
         handoff_text = load_text(args.handoff_text_path)
-        plan = build_message_plan(payload, handoff_text, args.channel, args.target)
+        config = load_optional_config(args.config_path)
+        channel, target, destination_source = resolve_destination(args, config)
+        plan = build_message_plan(payload, handoff_text, channel, target, destination_source)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -154,6 +208,7 @@ def main() -> int:
             print(f"channel: {plan['channel']}")
             print(f"target: {plan['target']}")
             print(f"mode: {plan['mode']}")
+            print(f"destination source: {plan['destination_source']}")
             print(f"action: {plan['notifier_action']}")
             print(f"delivery: {plan['delivery_kind']} -> {plan['delivery_target']}")
             print("command:")

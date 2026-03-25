@@ -64,3 +64,10 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 - Verification passed in two layers: preview mode rendered the exact send command from temp-generated `morning_handoff.txt` and `delivery_payload.json`, and `--send --openclaw-dry-run` successfully exercised the OpenClaw CLI send path without actually delivering a message.
 - Learned: the repo now has a real notifier boundary with a safe dry-run path, so the remaining unknown is the real destination wiring and message shape rather than whether the project can bridge into OpenClaw at all.
 - Next step: configure Edwin's real Signal/OpenClaw target and run one live end-to-end morning delivery, then decide whether the live-mode message should send the full handoff text or a shorter caption with the audio attachment.
+
+### 2026-03-25
+- Tightened `scripts/voice_digest_openclaw_notifier.py` so it can resolve its destination from CLI args, `VOICE_DIGEST_OPENCLAW_CHANNEL` / `VOICE_DIGEST_OPENCLAW_TARGET`, or a repo-local ignored `.voice_digest_notifier.json` file, with a clear error when none are configured.
+- Updated docs/workflow notes and ignored the local notifier config file so the real destination can be wired for cron without committing Edwin's contact target into the repo.
+- Verification passed in four steps: a temp `voice_digest_morning_job.py --dry-run` run regenerated stable handoff/payload files, the notifier failed cleanly with no destination configured, preview mode succeeded via env vars, `--send --openclaw-dry-run` succeeded via env vars, and preview mode also succeeded via the local config file.
+- Learned: the safest remaining path to first live delivery is now operational wiring, not script shape — the repo can support one-time local config plus a final dry-run check before a real morning send.
+- Next step: provision Edwin's real Signal/OpenClaw destination in the scheduler environment or local config, then perform one final dry-run send-path check and one true live delivery.

@@ -25,3 +25,15 @@ For overnight project work, default to this pattern:
 - verify before commit
 - commit and push milestone progress
 - leave the next action explicit for the next overnight phase
+
+## Notifier destination wiring
+
+The morning notifier can now get its OpenClaw destination from any of these sources, in priority order:
+- CLI flags: `--channel ... --target ...`
+- env vars: `VOICE_DIGEST_OPENCLAW_CHANNEL` and `VOICE_DIGEST_OPENCLAW_TARGET`
+- repo-local config file: `.voice_digest_notifier.json`
+
+Recommended morning-run shape:
+- keep the real destination out of committed docs/scripts
+- set env vars in the scheduler environment or provision `.voice_digest_notifier.json` locally
+- use `--openclaw-dry-run` for the first end-to-end send-path verification before one true live delivery
