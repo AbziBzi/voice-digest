@@ -280,6 +280,9 @@ Notes:
 - Prefer practical and low-cost solutions
 - Treat this like a real product project: notes, commits, experiments, iteration
 
-## Attribution test
-This commit exists to validate assistant-vs-human git attribution in the repo history.
- attribution in the repo history.
+## Commit attribution policy
+Assistant-driven commits in this repo should keep Edwin as the author and add a visible assistant trailer such as:
+
+`Co-authored-by: Codex <codex@openai.com>`
+
+The repo-local commit template `.gitmessage-assistant` is intended to make that shape the easy default.

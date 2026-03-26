@@ -7,7 +7,7 @@ Purpose: let the voice-digest project make real progress overnight without drift
 - Prefer scheduler-driven runs over one giant conversation.
 - Commit only after verification for the touched slice.
 - Push milestone commits so progress is visible live.
-- Use a GitHub-visible assistant identity for assistant-authored commits so authorship is legible in GitHub history.
+- Use Edwin as the commit author for assistant-driven work in this repo, with a GitHub-visible assistant co-author trailer so attribution stays legible in GitHub history.
 - Keep durable state in files, not just chat history.
 
 ## Budgets

@@ -32,4 +32,4 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 Provision Edwin's real Signal/OpenClaw destination via scheduler env vars or a local `.voice_digest_notifier.json`, run `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` once with the new ElevenLabs→OpenAI fallback path in place, then follow it with one true live dispatch run against Edwin's real target.
 
 ## Follow-up note
-Tomorrow's daytime maintenance should also finalize the assistant commit-attribution policy so assistant-originated commits are co-authored in a way that keeps Edwin visible as initiator while showing the specific agent identity.
+Assistant commit-attribution is now wired locally in this repo so Edwin remains the author and Codex stays visible as a co-author. The remaining operational gap is still the real OpenClaw/Signal destination and one true delivered morning run.

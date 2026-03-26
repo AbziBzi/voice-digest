@@ -1,0 +1,13 @@
+# Voice Digest commit message template
+#
+# Policy:
+# - Edwin is the human initiator and stays the commit author.
+# - The assistant used for the work is visible via a co-author trailer.
+#
+# Replace the subject/body below before committing.
+
+<subject>
+
+<body>
+
+Co-authored-by: Codex <codex@openai.com>

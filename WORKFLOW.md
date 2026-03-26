@@ -2,20 +2,17 @@
 
 ## Commit attribution
 
-Current temporary setup in this repo uses a GitHub-visible Codex identity:
+This repo now uses the intended assistant-attribution policy locally:
 
-- Name: `Codex`
-- Email: `codex@openai.com`
+- git author: Edwin (`Edwin Zubowicz <edwin.zubowicz@gmail.com>`)
+- assistant visibility: a visible `Co-authored-by: Codex <codex@openai.com>` trailer in assistant-driven commits
+- repo-local helper: `.gitmessage-assistant`, wired via `git config --local commit.template .gitmessage-assistant`
 
-But the intended long-term policy is slightly different:
-- assistant-driven commits should be clearly connected to Edwin as the initiating human
-- assistant identity should still be visible in GitHub history
-- for Codex-driven work, the preferred shape is: Edwin as author plus a visible `Co-authored-by: Codex <codex@openai.com>` trailer
-- for other harnesses, use the same pattern with the appropriate visible assistant identity where possible
+For other harnesses, keep the same shape:
+- Edwin remains the commit author when he is the initiating human
+- the specific assistant stays visible through a matching `Co-authored-by:` trailer when possible
 
 This keeps ownership clear while still preserving which agent contributed.
-
-The repo-local identity/config should be updated to match that policy as part of the broader assistant commit-attribution setup.
 
 ## Overnight workflow
 
