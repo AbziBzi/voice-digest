@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict
 
@@ -43,6 +44,14 @@ def parse_args() -> argparse.Namespace:
         choices=["live", "dry-run"],
         help="Optional expected mode for the referenced run.",
     )
+    parser.add_argument(
+        "--max-age-minutes",
+        type=float,
+        help=(
+            "Optional freshness guard. Reject the latest-run handoff when its manifest timestamp "
+            "is older than this many minutes."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -70,7 +79,24 @@ def expect_optional_file(path_value: object, label: str) -> Path | None:
     return expect_file(path_value, label)
 
 
-def validate_latest_run(state_path: Path, require_mode: str | None = None) -> ValidatedLatestRun:
+def parse_timestamp(value: object, label: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"missing {label}")
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(f"invalid {label}: {value!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def validate_latest_run(
+    state_path: Path,
+    require_mode: str | None = None,
+    max_age_minutes: float | None = None,
+) -> ValidatedLatestRun:
     resolved_state_path = state_path.resolve()
     if not resolved_state_path.is_file():
         raise ValueError(f"state file does not exist: {state_path}")
@@ -123,6 +149,22 @@ def validate_latest_run(state_path: Path, require_mode: str | None = None) -> Va
     if require_mode and mode != require_mode:
         raise ValueError(f"expected mode {require_mode!r}, got {mode!r}")
 
+    manifest_timestamp = parse_timestamp(manifest.get("timestamp"), "manifest timestamp")
+    state_timestamp = parse_timestamp(state.get("timestamp"), "state timestamp")
+    if state_timestamp != manifest_timestamp:
+        raise ValueError("state timestamp does not match manifest timestamp")
+
+    if max_age_minutes is not None:
+        if max_age_minutes < 0:
+            raise ValueError("max_age_minutes must be non-negative")
+        age_seconds = (datetime.now(timezone.utc) - manifest_timestamp).total_seconds()
+        age_minutes = age_seconds / 60
+        if age_minutes > max_age_minutes:
+            raise ValueError(
+                "latest run is stale: "
+                f"age {age_minutes:.1f} minutes exceeds max_age_minutes {max_age_minutes:.1f}"
+            )
+
     if mode == "live":
         if not audio_output.is_file():
             raise ValueError(f"live mode requires audio file: {audio_output}")
@@ -152,7 +194,11 @@ def validate_latest_run(state_path: Path, require_mode: str | None = None) -> Va
 def main() -> int:
     args = parse_args()
     try:
-        validated = validate_latest_run(args.state_path, require_mode=args.require_mode)
+        validated = validate_latest_run(
+            args.state_path,
+            require_mode=args.require_mode,
+            max_age_minutes=args.max_age_minutes,
+        )
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         return fail(str(exc))
 

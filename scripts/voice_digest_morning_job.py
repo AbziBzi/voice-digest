@@ -93,6 +93,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip live synthesis and write the TTS dry-run note instead.",
     )
+    parser.add_argument(
+        "--max-age-minutes",
+        type=float,
+        help=(
+            "Optional freshness guard passed through to morning handoff and delivery payload validation. "
+            "Useful when downstream automation should reject stale latest-run artifacts."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -158,6 +166,8 @@ def main() -> int:
         "--format",
         "text",
     ]
+    if args.max_age_minutes is not None:
+        handoff_text_command.extend(["--max-age-minutes", str(args.max_age_minutes)])
     handoff_json_command = [
         sys.executable,
         str(MORNING_HANDOFF_SCRIPT),
@@ -166,6 +176,8 @@ def main() -> int:
         "--format",
         "json",
     ]
+    if args.max_age_minutes is not None:
+        handoff_json_command.extend(["--max-age-minutes", str(args.max_age_minutes)])
     payload_command = [
         sys.executable,
         str(DELIVERY_PAYLOAD_SCRIPT),
@@ -174,6 +186,8 @@ def main() -> int:
         "--output",
         str(args.payload_json_path),
     ]
+    if args.max_age_minutes is not None:
+        payload_command.extend(["--max-age-minutes", str(args.max_age_minutes)])
 
     handoff_text = run_command(handoff_text_command, "morning handoff text")
     handoff_json = run_command(handoff_json_command, "morning handoff json")

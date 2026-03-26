@@ -111,6 +111,14 @@ def parse_args() -> argparse.Namespace:
         help="Skip live synthesis and write the TTS dry-run note instead.",
     )
     parser.add_argument(
+        "--max-age-minutes",
+        type=float,
+        help=(
+            "Optional freshness guard passed through to downstream validation so the dispatch job "
+            "can reject stale latest-run artifacts."
+        ),
+    )
+    parser.add_argument(
         "--channel",
         help="OpenClaw channel override passed to the notifier.",
     )
@@ -205,6 +213,8 @@ def build_morning_job_command(args: argparse.Namespace) -> list[str]:
         command.extend(["--model-id", args.model_id])
     if args.dry_run:
         command.append("--dry-run")
+    if args.max_age_minutes is not None:
+        command.extend(["--max-age-minutes", str(args.max_age_minutes)])
     return command
 
 
@@ -284,9 +294,12 @@ def render_status_text(status: dict[str, Any]) -> str:
 
     dispatch = status.get("dispatch")
     if isinstance(dispatch, dict):
+        max_age_minutes = dispatch.get("max_age_minutes")
         requested_mode = dispatch.get("requested_audio_message_mode")
         resolved_mode = dispatch.get("resolved_audio_message_mode")
         resolved_mode_source = dispatch.get("audio_message_mode_source")
+        if max_age_minutes is not None:
+            lines.append(f"max_age_minutes: {max_age_minutes}")
         if requested_mode:
             lines.append(f"requested_audio_message_mode: {requested_mode}")
         if resolved_mode:
@@ -352,6 +365,7 @@ def build_base_status(args: argparse.Namespace, started_at: str) -> dict[str, An
             "send": args.send,
             "openclaw_dry_run": args.openclaw_dry_run,
             "tts_dry_run": args.dry_run,
+            "max_age_minutes": args.max_age_minutes,
             "requested_audio_message_mode": args.audio_message_mode,
         },
         "commands": {},

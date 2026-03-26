@@ -51,14 +51,27 @@ def parse_args() -> argparse.Namespace:
         default="text",
         help="Render either human-readable text or JSON. Defaults to text.",
     )
+    parser.add_argument(
+        "--max-age-minutes",
+        type=float,
+        help=(
+            "Optional freshness guard. Reject the latest-run handoff when its manifest timestamp "
+            "is older than this many minutes."
+        ),
+    )
     return parser.parse_args()
 
 
-def build_handoff(repo_root: Path, progress_path: Path, state_path: Path) -> dict[str, object]:
+def build_handoff(
+    repo_root: Path,
+    progress_path: Path,
+    state_path: Path,
+    max_age_minutes: float | None = None,
+) -> dict[str, object]:
     checkpoint = build_checkpoint(repo_root, progress_path, state_path)
     delivery: dict[str, object] | None = None
     if state_path.is_file():
-        delivery = build_delivery_payload(state_path)
+        delivery = build_delivery_payload(state_path, max_age_minutes=max_age_minutes)
     return {
         "checkpoint": checkpoint,
         "delivery": delivery,
@@ -156,7 +169,12 @@ def render_text(handoff: dict[str, object]) -> str:
 def main() -> int:
     args = parse_args()
     try:
-        handoff = build_handoff(args.repo_root, args.progress_path, args.state_path)
+        handoff = build_handoff(
+            args.repo_root,
+            args.progress_path,
+            args.state_path,
+            max_age_minutes=args.max_age_minutes,
+        )
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

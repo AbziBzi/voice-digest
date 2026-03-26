@@ -153,6 +153,15 @@ python3 scripts/voice_digest_morning_job.py \
   --dry-run
 ```
 
+If downstream automation should reject stale artifacts instead of reusing an old `latest_run.json`, add a freshness guard:
+
+```bash
+python3 scripts/voice_digest_morning_job.py \
+  --input-dir incoming_digests \
+  --dry-run \
+  --max-age-minutes 180
+```
+
 By default this writes:
 - `out/latest_run.json`
 - `out/morning_handoff.txt`
@@ -223,6 +232,16 @@ python3 scripts/voice_digest_dispatch_job.py \
   --input-dir incoming_digests \
   --send \
   --openclaw-dry-run
+```
+
+That same entrypoint can carry the freshness guard through to the morning handoff + payload validation steps:
+
+```bash
+python3 scripts/voice_digest_dispatch_job.py \
+  --input-dir incoming_digests \
+  --send \
+  --openclaw-dry-run \
+  --max-age-minutes 180
 ```
 
 To test the shorter live-audio caption path through the full dispatch flow:

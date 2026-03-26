@@ -41,6 +41,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional output file. Defaults to stdout.",
     )
+    parser.add_argument(
+        "--max-age-minutes",
+        type=float,
+        help=(
+            "Optional freshness guard. Reject the latest-run handoff when its manifest timestamp "
+            "is older than this many minutes."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -51,8 +59,16 @@ def read_preview(path: Path, limit: int = 280) -> str:
     return text[: limit - 3].rstrip() + "..."
 
 
-def build_delivery_payload(state_path: Path, require_mode: str | None = None) -> dict[str, object]:
-    validated = validate_latest_run(state_path, require_mode=require_mode)
+def build_delivery_payload(
+    state_path: Path,
+    require_mode: str | None = None,
+    max_age_minutes: float | None = None,
+) -> dict[str, object]:
+    validated = validate_latest_run(
+        state_path,
+        require_mode=require_mode,
+        max_age_minutes=max_age_minutes,
+    )
     state = validated["state"]
     manifest = validated["manifest"]
     inputs = manifest.get("inputs", {})
@@ -114,7 +130,11 @@ def write_output(payload: dict[str, object], output_path: Path | None) -> None:
 def main() -> int:
     args = parse_args()
     try:
-        payload = build_delivery_payload(args.state_path, require_mode=args.require_mode)
+        payload = build_delivery_payload(
+            args.state_path,
+            require_mode=args.require_mode,
+            max_age_minutes=args.max_age_minutes,
+        )
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
