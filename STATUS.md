@@ -10,6 +10,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Spoken-script preparation works via `scripts/voice_digest_prepare.py`.
 - Combined script + TTS flow works via `scripts/voice_digest_pipeline.py`.
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
+- Dispatch status artifacts now include the underlying failing notifier/morning-job error detail, so missing destination wiring and similar cron issues surface directly in `out/delivery_status.*`.
 
 ## Current gap
 The project can now bundle a digest run into a dated artifact folder with a manifest, select the newest digest text file from a drop directory, validate the stable `latest_run.json` handoff, emit a delivery-ready payload for a notifier to consume in live vs dry-run mode, generate a compact overnight checkpoint that summarizes repo state plus latest-run readiness, render one combined morning handoff that merges repo checkpoint + delivery-readiness details into a single text or JSON summary, run one scheduler-friendly morning job that writes stable handoff + payload files for downstream automation, bridge those outputs into an `openclaw message send` call that attaches audio in live mode or sends a text fallback in dry-run mode, optionally use a shorter caption instead of the full handoff when sending live audio, resolve that live-audio message mode from the same CLI/env/local-config stack as the destination wiring, surface the resolved mode in delivery-status diagnostics, and run one top-level dispatch job that executes both phases together while leaving stable `delivery_status.json` / `delivery_status.txt` results behind on success or failure. The remaining gap is no longer scheduler observability; it is wiring Edwin's real OpenClaw/Signal destination and exercising one true live delivered morning run.
@@ -24,7 +25,7 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 1. Point the new OpenClaw notifier at Edwin's real Signal/OpenClaw target so the overnight summary is actually surfaced at day start.
 2. Exercise one true end-to-end morning run with fresh input and a delivered artifact or fallback.
 3. Create a robust spoken-digest format for the real morning digest output.
-4. Tighten the scheduler contract so morning failures surface clearly without manual log inspection.
+4. Tighten the scheduler contract so morning failures surface clearly without manual log inspection. (Now improved for dispatch-status artifacts; remaining work is exercising the real wired destination.)
 5. Exercise both live-mode message-body variants against Edwin's real destination and choose whether `full` or `caption` should be the scheduler default.
 
 ## Immediate next step

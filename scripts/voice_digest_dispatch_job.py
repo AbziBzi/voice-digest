@@ -233,6 +233,18 @@ def build_notifier_command(args: argparse.Namespace) -> list[str]:
     return command
 
 
+def summarize_command_failure(result: subprocess.CompletedProcess[str], stage: str) -> dict[str, Any]:
+    detail = clip_output(result.stderr) or clip_output(result.stdout) or None
+    failure = {
+        "stage": stage,
+        "returncode": result.returncode,
+        "message": f"{stage} failed with exit code {result.returncode}",
+    }
+    if detail:
+        failure["detail"] = detail
+    return failure
+
+
 def render_status_text(status: dict[str, Any]) -> str:
     lines = [
         "Voice Digest Delivery Status",
@@ -285,9 +297,17 @@ def render_status_text(status: dict[str, Any]) -> str:
     error = status.get("error")
     if isinstance(error, dict):
         lines.append(f"error_stage: {error.get('stage')}")
+        returncode = error.get("returncode")
+        if returncode is not None:
+            lines.append(f"error_returncode: {returncode}")
         message = error.get("message")
         if message:
             lines.append(f"error_message: {message}")
+        detail = error.get("detail")
+        if detail:
+            lines.append("error_detail:")
+            for line in str(detail).splitlines():
+                lines.append(f"  {line}")
 
     artifacts = status.get("artifacts")
     if isinstance(artifacts, dict):
@@ -375,10 +395,7 @@ def main() -> int:
 
     if morning_result.returncode != 0:
         status["status"] = "failed"
-        status["error"] = {
-            "stage": "morning_job",
-            "message": f"morning job failed with exit code {morning_result.returncode}",
-        }
+        status["error"] = summarize_command_failure(morning_result, "morning_job")
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
         if morning_result.stdout:
@@ -436,10 +453,7 @@ def main() -> int:
 
     if notifier_result.returncode != 0:
         status["status"] = "failed"
-        status["error"] = {
-            "stage": notifier_stage,
-            "message": f"notifier failed with exit code {notifier_result.returncode}",
-        }
+        status["error"] = summarize_command_failure(notifier_result, notifier_stage)
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
         if morning_result.stdout:
