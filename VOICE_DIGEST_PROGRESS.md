@@ -11,6 +11,11 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-26
+- Defaulted `scripts/voice_digest_dispatch_job.py --input-dir` to the repo’s conventional `incoming_digests/` drop directory, so the scheduler-facing entrypoint now matches the README command shape instead of failing fast on a missing required flag.
+- Verification passed in two layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py` succeeded, and a temp no-flag dispatch run succeeded after copying a sample digest into `incoming_digests/`, confirming the defaulted entrypoint exercised the full dry-run send path.
+- Learned: the most immediate delivery-path paper cut was no longer notifier logic but scheduler ergonomics — the “one command” dispatch wrapper should really be runnable with the repo’s conventional drop directory by default.
+- Next step: provision Edwin's real Signal/OpenClaw target and run one final `voice_digest_dispatch_job.py --send --openclaw-dry-run` check against the intended live destination wiring before a true live dispatch.
+
 - Hardened `scripts/voice_digest_openclaw_notifier.py` so `--send` now checks for an available `openclaw` CLI and returns a clean operational error instead of crashing with a Python traceback when the binary is missing or cannot be executed.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py` succeeded, a temp notifier `--send --openclaw-dry-run --json` run with `PATH=/usr/bin:/bin` returned a structured `status: error` payload with the planned send metadata, and a temp end-to-end `voice_digest_dispatch_job.py --dry-run --send --openclaw-dry-run` run under that same restricted `PATH` failed at `notifier_send` while `delivery_status.txt` preserved the resolved destination/mode plus the explicit missing-CLI error.
 - Learned: the real morning send path now fails like an operational integration boundary instead of an uncaught script exception, which makes cron-visible diagnostics materially sharper before the first live destination run.

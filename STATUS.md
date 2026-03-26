@@ -30,7 +30,7 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 5. Exercise both live-mode message-body variants against Edwin's real destination and choose whether `full` or `caption` should be the scheduler default.
 
 ## Immediate next step
-Provision Edwin's real Signal/OpenClaw destination via scheduler env vars or a local `.voice_digest_notifier.json`, run `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` once with the new ElevenLabs→OpenAI fallback path in place, then follow it with one true live dispatch run against Edwin's real target.
+Provision Edwin's real Signal/OpenClaw destination via scheduler env vars or a local `.voice_digest_notifier.json`, then run `scripts/voice_digest_dispatch_job.py --input-dir incoming_digests --send --openclaw-dry-run` once (or omit `--input-dir` now that the dispatch job defaults to `incoming_digests/`) with the new ElevenLabs→OpenAI fallback path in place, then follow it with one true live dispatch run against Edwin's real target.
 
 ## Follow-up note
 Assistant commit-attribution is now wired locally in this repo so Edwin remains the author and Codex stays visible as a co-author. The remaining operational gap is still the real OpenClaw/Signal destination and one true delivered morning run.

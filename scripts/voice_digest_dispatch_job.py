@@ -14,6 +14,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MORNING_JOB_SCRIPT = REPO_ROOT / "scripts" / "voice_digest_morning_job.py"
 NOTIFIER_SCRIPT = REPO_ROOT / "scripts" / "voice_digest_openclaw_notifier.py"
+DEFAULT_INPUT_DIR = REPO_ROOT / "incoming_digests"
 DEFAULT_RUNS_DIR = REPO_ROOT / "out" / "runs"
 DEFAULT_STATE_PATH = REPO_ROOT / "out" / "latest_run.json"
 DEFAULT_HANDOFF_TEXT_PATH = REPO_ROOT / "out" / "morning_handoff.txt"
@@ -35,8 +36,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        required=True,
-        help="Directory containing digest text files dropped by the upstream digest generator.",
+        default=DEFAULT_INPUT_DIR,
+        help=(
+            "Directory containing digest text files dropped by the upstream digest generator. "
+            "Defaults to ./incoming_digests under the repo root."
+        ),
     )
     parser.add_argument(
         "--glob",
