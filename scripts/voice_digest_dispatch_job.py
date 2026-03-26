@@ -270,6 +270,18 @@ def render_status_text(status: dict[str, Any]) -> str:
         if source:
             lines.append(f"destination_source: {source}")
 
+    dispatch = status.get("dispatch")
+    if isinstance(dispatch, dict):
+        requested_mode = dispatch.get("requested_audio_message_mode")
+        resolved_mode = dispatch.get("resolved_audio_message_mode")
+        resolved_mode_source = dispatch.get("audio_message_mode_source")
+        if requested_mode:
+            lines.append(f"requested_audio_message_mode: {requested_mode}")
+        if resolved_mode:
+            lines.append(f"resolved_audio_message_mode: {resolved_mode}")
+        if resolved_mode_source:
+            lines.append(f"audio_message_mode_source: {resolved_mode_source}")
+
     error = status.get("error")
     if isinstance(error, dict):
         lines.append(f"error_stage: {error.get('stage')}")
@@ -320,7 +332,7 @@ def build_base_status(args: argparse.Namespace, started_at: str) -> dict[str, An
             "send": args.send,
             "openclaw_dry_run": args.openclaw_dry_run,
             "tts_dry_run": args.dry_run,
-            "audio_message_mode": args.audio_message_mode or "full",
+            "requested_audio_message_mode": args.audio_message_mode,
         },
         "commands": {},
     }
@@ -419,6 +431,8 @@ def main() -> int:
                 "target": plan.get("target"),
                 "source": plan.get("destination_source"),
             }
+            status["dispatch"]["resolved_audio_message_mode"] = plan.get("audio_message_mode")
+            status["dispatch"]["audio_message_mode_source"] = plan.get("audio_message_mode_source")
 
     if notifier_result.returncode != 0:
         status["status"] = "failed"

@@ -64,11 +64,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--audio-message-mode",
         choices=["full", "caption"],
-        default=os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV, "full"),
         help=(
             "How to build the message body when sending live audio. `full` sends the whole morning handoff, "
-            "while `caption` sends a shorter summary. Defaults to $"
-            f"{DEFAULT_AUDIO_MESSAGE_MODE_ENV} or full."
+            "while `caption` sends a shorter summary. Defaults to CLI override, then $"
+            f"{DEFAULT_AUDIO_MESSAGE_MODE_ENV}, then config file, then full."
         ),
     )
     parser.add_argument(
@@ -135,6 +134,22 @@ def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> 
             source = "mixed"
 
     return channel, target, source
+
+
+def resolve_audio_message_mode(
+    args: argparse.Namespace,
+    config: dict[str, object],
+) -> tuple[str, str]:
+    config_mode = config.get("audio_message_mode")
+    env_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
+
+    if args.audio_message_mode:
+        return args.audio_message_mode, "cli"
+    if isinstance(env_mode, str) and env_mode in {"full", "caption"}:
+        return env_mode, "env"
+    if isinstance(config_mode, str) and config_mode in {"full", "caption"}:
+        return config_mode, "config"
+    return "full", "default"
 
 
 def build_audio_caption(payload: dict[str, object]) -> str:
@@ -246,14 +261,16 @@ def main() -> int:
         handoff_text = load_text(args.handoff_text_path)
         config = load_optional_config(args.config_path)
         channel, target, destination_source = resolve_destination(args, config)
+        audio_message_mode, audio_message_mode_source = resolve_audio_message_mode(args, config)
         plan = build_message_plan(
             payload,
             handoff_text,
             channel,
             target,
             destination_source,
-            args.audio_message_mode,
+            audio_message_mode,
         )
+        plan["audio_message_mode_source"] = audio_message_mode_source
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -270,6 +287,7 @@ def main() -> int:
             print(f"action: {plan['notifier_action']}")
             print(f"delivery: {plan['delivery_kind']} -> {plan['delivery_target']}")
             print(f"audio message mode: {plan['audio_message_mode']}")
+            print(f"audio message mode source: {plan['audio_message_mode_source']}")
             print("command:")
             print(render_preview(plan))
         return 0

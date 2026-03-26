@@ -33,12 +33,19 @@ The morning notifier can now get its OpenClaw destination from any of these sour
 - env vars: `VOICE_DIGEST_OPENCLAW_CHANNEL` and `VOICE_DIGEST_OPENCLAW_TARGET`
 - repo-local config file: `.voice_digest_notifier.json`
 
+The live-audio message-body mode now follows the same operational pattern:
+- CLI flag: `--audio-message-mode ...`
+- env var: `VOICE_DIGEST_AUDIO_MESSAGE_MODE`
+- repo-local config file field: `audio_message_mode`
+- default: `full`
+
 Recommended morning-run shape:
 - keep the real destination out of committed docs/scripts
 - set env vars in the scheduler environment or provision `.voice_digest_notifier.json` locally
+- if the preferred live message shape is already known, store `audio_message_mode` alongside the destination in that same local config so cron does not need an extra flag
 - use `scripts/voice_digest_dispatch_job.py` as the scheduler entrypoint once the destination is wired, because it writes stable delivery status artifacts for success and failure
 - use `--openclaw-dry-run` for the first end-to-end send-path verification before one true live delivery
-- if the full morning handoff is too long for an attached-audio message body, pass `--audio-message-mode caption` (or set `VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption`) to send a shorter summary instead
+- if the full morning handoff is too long for an attached-audio message body, pass `--audio-message-mode caption`, set `VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption`, or write `"audio_message_mode": "caption"` in `.voice_digest_notifier.json`
 
 ## TTS provider policy
 

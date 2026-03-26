@@ -180,11 +180,12 @@ Or via a repo-local config file at `.voice_digest_notifier.json`:
 ```json
 {
   "channel": "signal",
-  "target": "+37060000000"
+  "target": "+37060000000",
+  "audio_message_mode": "caption"
 }
 ```
 
-The notifier resolves the destination in this order: CLI args, then env vars, then config file.
+The notifier resolves the destination in this order: CLI args, then env vars, then config file. For live audio sends, `audio_message_mode` follows the same precedence: CLI flag, then `VOICE_DIGEST_AUDIO_MESSAGE_MODE`, then config file, then `full`.
 
 To verify the real OpenClaw send path without delivering a message:
 
