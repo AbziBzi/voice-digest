@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -245,12 +246,32 @@ def render_preview(plan: dict[str, object]) -> str:
     return " ".join(subprocess.list2cmdline([part]) for part in command)
 
 
+def render_error_json(message: str, plan: dict[str, object] | None = None) -> str:
+    payload: dict[str, object] = {"status": "error", "error": message}
+    if plan is not None:
+        payload["plan"] = plan
+    return json.dumps(payload, indent=2) + "\n"
+
+
+def ensure_openclaw_available() -> None:
+    if shutil.which("openclaw") is None:
+        raise RuntimeError(
+            "openclaw CLI is not available in PATH; install/configure it before using --send"
+        )
+
+
 def run_openclaw(plan: dict[str, object], openclaw_dry_run: bool) -> subprocess.CompletedProcess[str]:
+    ensure_openclaw_available()
     command = list(plan["command"])
     if openclaw_dry_run:
         command.append("--dry-run")
     command.append("--json")
-    return subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        return subprocess.run(command, check=True, capture_output=True, text=True)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"failed to execute openclaw CLI: {exc.filename or 'openclaw'} was not found"
+        ) from exc
 
 
 def main() -> int:
@@ -294,6 +315,12 @@ def main() -> int:
 
     try:
         result = run_openclaw(plan, openclaw_dry_run=args.openclaw_dry_run)
+    except RuntimeError as exc:
+        if args.json:
+            sys.stdout.write(render_error_json(str(exc), plan))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
+        return 1
     except subprocess.CalledProcessError as exc:
         if exc.stdout:
             sys.stdout.write(exc.stdout)

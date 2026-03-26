@@ -10,6 +10,12 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 
 ## Entries
 
+### 2026-03-26
+- Hardened `scripts/voice_digest_openclaw_notifier.py` so `--send` now checks for an available `openclaw` CLI and returns a clean operational error instead of crashing with a Python traceback when the binary is missing or cannot be executed.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py` succeeded, a temp notifier `--send --openclaw-dry-run --json` run with `PATH=/usr/bin:/bin` returned a structured `status: error` payload with the planned send metadata, and a temp end-to-end `voice_digest_dispatch_job.py --dry-run --send --openclaw-dry-run` run under that same restricted `PATH` failed at `notifier_send` while `delivery_status.txt` preserved the resolved destination/mode plus the explicit missing-CLI error.
+- Learned: the real morning send path now fails like an operational integration boundary instead of an uncaught script exception, which makes cron-visible diagnostics materially sharper before the first live destination run.
+- Next step: provision Edwin's real Signal/OpenClaw target and run one final `voice_digest_dispatch_job.py --send --openclaw-dry-run` check in the intended environment before a true live dispatch.
+
 ### 2026-03-22
 - Added `scripts/voice_digest_tts.py`, a minimal Python CLI for turning short digest text into MP3 with ElevenLabs.
 - Added a graceful fallback path: when `ELEVENLABS_API_KEY` is missing, the script writes `*.mp3.dry-run.txt` instead of failing.
