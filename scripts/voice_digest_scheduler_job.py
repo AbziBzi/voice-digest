@@ -73,8 +73,25 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def clip_output(text: str, limit: int = 2000) -> str:
+    stripped = text.strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[: limit - 3].rstrip() + "..."
+
+
 def run_from_latest(command: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(command, check=True, capture_output=True, text=True)
+    try:
+        return subprocess.run(command, check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as exc:
+        if exc.stdout:
+            sys.stdout.write(exc.stdout)
+        if exc.stderr:
+            sys.stderr.write(exc.stderr)
+        detail = clip_output(exc.stderr) or clip_output(exc.stdout)
+        if detail:
+            raise RuntimeError(f"latest-digest selection failed: {detail}") from exc
+        raise RuntimeError(f"latest-digest selection failed with exit code {exc.returncode}") from exc
 
 
 def extract_line(prefix: str, output: str) -> str:
@@ -154,4 +171,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None

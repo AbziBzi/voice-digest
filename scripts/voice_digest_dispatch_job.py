@@ -247,8 +247,25 @@ def build_notifier_command(args: argparse.Namespace) -> list[str]:
     return command
 
 
+def extract_error_summary(*texts: str) -> str | None:
+    for text in texts:
+        if not text:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("error:"):
+                return stripped
+    for text in texts:
+        if not text:
+            continue
+        clipped = clip_output(text)
+        if clipped:
+            return clipped
+    return None
+
+
 def summarize_command_failure(result: subprocess.CompletedProcess[str], stage: str) -> dict[str, Any]:
-    detail = clip_output(result.stderr) or clip_output(result.stdout) or None
+    detail = extract_error_summary(result.stderr, result.stdout)
     failure = {
         "stage": stage,
         "returncode": result.returncode,

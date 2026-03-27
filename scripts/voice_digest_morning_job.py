@@ -104,6 +104,13 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def clip_output(text: str, limit: int = 2000) -> str:
+    stripped = text.strip()
+    if len(stripped) <= limit:
+        return stripped
+    return stripped[: limit - 3].rstrip() + "..."
+
+
 def run_command(command: list[str], label: str) -> subprocess.CompletedProcess[str]:
     try:
         result = subprocess.run(command, check=True, capture_output=True, text=True)
@@ -112,6 +119,9 @@ def run_command(command: list[str], label: str) -> subprocess.CompletedProcess[s
             sys.stdout.write(exc.stdout)
         if exc.stderr:
             sys.stderr.write(exc.stderr)
+        detail = clip_output(exc.stderr) or clip_output(exc.stdout)
+        if detail:
+            raise RuntimeError(f"{label} failed: {detail}") from exc
         raise RuntimeError(f"{label} failed with exit code {exc.returncode}") from exc
 
     if result.stdout:
@@ -203,4 +213,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except RuntimeError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
