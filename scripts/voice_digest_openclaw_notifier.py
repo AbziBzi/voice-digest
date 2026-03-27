@@ -364,7 +364,7 @@ def main() -> int:
         result = run_openclaw(plan, openclaw_dry_run=args.openclaw_dry_run)
     except RuntimeError as exc:
         if args.json:
-            sys.stdout.write(render_error_json(str(exc), plan))
+            sys.stdout.write(render_error_json(str(exc), plan, diagnostics=diagnostics))
         else:
             print(f"error: {exc}", file=sys.stderr)
         return 1
@@ -378,6 +378,7 @@ def main() -> int:
                     returncode=exc.returncode,
                     stdout=exc.stdout.strip() if exc.stdout else None,
                     stderr=exc.stderr.strip() if exc.stderr else None,
+                    diagnostics=diagnostics,
                 )
             )
         else:

@@ -14,6 +14,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - The OpenClaw notifier send path now fails cleanly when the `openclaw` CLI is missing from `PATH`, returning a structured operational error instead of a Python traceback.
 - OpenClaw send failures now stay structured in `--json` mode, so dispatch status artifacts can preserve the notifier plan plus a clear send-error summary instead of degrading into generic stderr parsing.
 - Missing-destination notifier failures now emit setup diagnostics in `--json` mode (config-file presence, env-var presence, CLI override presence, and artifact paths), and dispatch status artifacts preserve those diagnostics for faster cron-side wiring triage.
+- Actual notifier send-path failures now preserve that same destination/setup diagnostics block in `--json` mode, so first live-send troubleshooting still has the config/env/artifact context instead of only the transport error.
 - Delivery payloads, morning handoffs, and dispatch status artifacts now surface run age plus selected-input freshness details, so morning triage can tell at a glance whether the upstream digest and generated artifact are actually fresh without opening multiple files.
 - Overnight checkpoint and morning handoff summaries now pull the newest top-of-file progress entry from `VOICE_DIGEST_PROGRESS.md`, so morning status no longer regresses to an older dated section when the log is kept newest-first.
 

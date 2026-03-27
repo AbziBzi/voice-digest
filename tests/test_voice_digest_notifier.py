@@ -93,6 +93,8 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertEqual(result["stderr"], "gateway unavailable")
             self.assertEqual(result["plan"]["audio_message_mode"], "caption")
             self.assertEqual(result["plan"]["channel"], "signal")
+            self.assertEqual(result["diagnostics"]["config_exists"], False)
+            self.assertEqual(result["diagnostics"]["payload_path"], str(payload_path))
 
     def test_main_emits_destination_diagnostics_when_destination_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

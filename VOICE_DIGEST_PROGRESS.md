@@ -11,6 +11,12 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-27
+- Preserved notifier setup diagnostics on real send-path failures: `scripts/voice_digest_openclaw_notifier.py --json` now includes the same destination/config/env/artifact diagnostics block for `openclaw` runtime/send failures that it already emitted for missing-destination config failures, so morning triage keeps the wiring context even when transport execution is the part that breaks.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed, and a repo-root notifier run under `PATH=/usr/bin:/bin` with `--send --openclaw-dry-run --json` now returns both the missing-CLI error and the full diagnostics block.
+- Learned: the first real delivery failures are likely to be messy operational edges rather than pure config absence, so preserving setup diagnostics across both failure shapes makes the stable status artifact much more useful at 8 AM.
+- Next step: wire the real upstream digest drop plus Edwin's real Signal/OpenClaw destination, then run one intended-config `voice_digest_dispatch_job.py --send --openclaw-dry-run` before the first true live delivery.
+
+### 2026-03-27
 - Threaded freshness metadata into the scheduler-facing delivery status contract: `scripts/voice_digest_dispatch_job.py` now copies `run.age_minutes` plus `summary.selected_input_details.*` from `delivery_payload.json` into `delivery_status.json`, and renders run/input age, modified time, and size in `delivery_status.txt` for one-file cron triage.
 - Added regression coverage in `tests/test_voice_digest_dispatch_job.py` so notifier-failure status artifacts keep those new freshness fields in both JSON and text form.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed, and a temp end-to-end `voice_digest_dispatch_job.py --dry-run --channel signal --target +37060000000` run produced a successful `delivery_status.txt` with `run_age_minutes`, `selected_input_age_minutes`, `selected_input_modified_at`, and `selected_input_size_bytes` lines.
