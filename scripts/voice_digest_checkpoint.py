@@ -101,36 +101,24 @@ def get_repo_status(repo_root: Path) -> dict[str, object]:
 def extract_latest_progress_entry(progress_path: Path) -> list[str]:
     text = progress_path.read_text(encoding="utf-8")
     lines = text.splitlines()
-    entries: list[str] = []
+    current: list[str] = []
     capture = False
 
     for line in lines:
         if line.startswith("### "):
+            if capture:
+                break
+            current = [line]
             capture = True
-            entries = [line]
             continue
-        if capture and line.startswith("### "):
-            break
         if capture:
-            entries.append(line)
+            current.append(line)
 
-    if not entries:
+    entry = [line for line in current if line.strip()]
+    if not entry:
         raise ValueError(f"no progress entries found in {progress_path}")
 
-    # Find the last heading and collect its body.
-    all_entries: list[list[str]] = []
-    current: list[str] = []
-    for line in lines:
-        if line.startswith("### "):
-            if current:
-                all_entries.append(current)
-            current = [line]
-        elif current:
-            current.append(line)
-    if current:
-        all_entries.append(current)
-
-    return [line for line in all_entries[-1] if line.strip()]
+    return entry
 
 
 def get_latest_run_summary(state_path: Path) -> dict[str, object] | None:

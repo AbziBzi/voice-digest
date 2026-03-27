@@ -11,6 +11,11 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-27
+- Fixed `scripts/voice_digest_checkpoint.py` so overnight checkpoint / morning handoff summaries now treat the topmost dated section in `VOICE_DIGEST_PROGRESS.md` as the latest entry, matching the file’s newest-first layout instead of accidentally surfacing the older trailing section.
+- Added `tests/test_voice_digest_checkpoint.py` to lock in that newest-first progress parsing behavior.
+- Verification passed in three layers: the new unit test succeeded, the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed, and a repo-root `voice_digest_dispatch_job.py --dry-run --send --openclaw-dry-run` run regenerated `out/morning_handoff.txt` with a `Latest progress` line from today’s 2026-03-27 section rather than the stale 2026-03-25 block.
+- Learned: morning trust depends on the handoff selecting the right human-facing progress note; a small newest-vs-last parser assumption can quietly make the project look older than it is.
+- Next step: once Edwin’s real input path and destination are wired, rerun the same scheduler-facing dry-run against that intended live configuration and choose the default live audio message mode from real delivery feedback.
 - Tightened `scripts/voice_digest_prepare.py` so spoken-script generation no longer turns ordinary prose into `VISUAL FLAG:` lines just because it contains generic words like “image”; visual cues now require either an explicit visual prefix or a stronger “review this visual” pattern.
 - Also taught the spoken-prep step to drop boilerplate end markers like `End of article.` so TTS output sounds cleaner on full-article inputs.
 - Added `tests/test_voice_digest_prepare.py` with regression coverage for explicit visual markers, false-positive avoidance, review-language detection, and end-marker stripping.
