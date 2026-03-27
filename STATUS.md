@@ -7,7 +7,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Text morning digest delivery works on Signal via explicit cron routing.
 - ElevenLabs synthesis works locally via `scripts/voice_digest_tts.py`.
 - `scripts/voice_digest_tts.py` now uses OpenAI TTS as the first live fallback when ElevenLabs quota, free-tier limits, or availability become the blocker.
-- Spoken-script preparation works via `scripts/voice_digest_prepare.py`.
+- Spoken-script preparation works via `scripts/voice_digest_prepare.py`, now with tighter visual-flag heuristics that avoid false positives from ordinary prose and skip boilerplate end markers.
 - Combined script + TTS flow works via `scripts/voice_digest_pipeline.py`.
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 - Dispatch status artifacts now include the underlying failing notifier/morning-job error detail, so missing destination wiring and similar cron issues surface directly in `out/delivery_status.*`.

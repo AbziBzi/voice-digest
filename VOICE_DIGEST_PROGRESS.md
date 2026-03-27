@@ -10,6 +10,14 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 
 ## Entries
 
+### 2026-03-27
+- Tightened `scripts/voice_digest_prepare.py` so spoken-script generation no longer turns ordinary prose into `VISUAL FLAG:` lines just because it contains generic words like “image”; visual cues now require either an explicit visual prefix or a stronger “review this visual” pattern.
+- Also taught the spoken-prep step to drop boilerplate end markers like `End of article.` so TTS output sounds cleaner on full-article inputs.
+- Added `tests/test_voice_digest_prepare.py` with regression coverage for explicit visual markers, false-positive avoidance, review-language detection, and end-marker stripping.
+- Verification passed in two layers: `python3 -m unittest tests/test_voice_digest_prepare.py` succeeded, and `python3 scripts/voice_digest_prepare.py --input out/article7-world-models-full.txt` no longer misclassified the “synthesized image” paragraph as a visual flag.
+- Learned: spoken-digest UX is brittle when visual detection uses raw keyword presence; daily-digest inputs need tighter heuristics so audio emphasis feels intentional instead of noisy.
+- Next step: keep pushing the listening UX toward real morning use by shortening or restructuring long-form article output into a more bounded spoken brief before synthesis.
+
 ### 2026-03-26
 - Defaulted `scripts/voice_digest_dispatch_job.py --input-dir` to the repo’s conventional `incoming_digests/` drop directory, so the scheduler-facing entrypoint now matches the README command shape instead of failing fast on a missing required flag.
 - Verification passed in two layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py` succeeded, and a temp no-flag dispatch run succeeded after copying a sample digest into `incoming_digests/`, confirming the defaulted entrypoint exercised the full dry-run send path.

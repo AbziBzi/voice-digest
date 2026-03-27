@@ -24,6 +24,28 @@ VISUAL_PREFIXES = (
     "table:",
     "image:",
 )
+VISUAL_NOUNS = (
+    "chart",
+    "graph",
+    "diagram",
+    "screenshot",
+    "table",
+    "slide",
+    "figure",
+)
+VISUAL_REVIEW_HINTS = (
+    "open",
+    "look at",
+    "see",
+    "review",
+    "inspect",
+    "revisit",
+    "compare",
+)
+SKIP_PARAGRAPHS = {
+    "end of article.",
+    "end of digest.",
+}
 
 
 def fail(message: str, exit_code: int = 1) -> NoReturn:
@@ -78,17 +100,28 @@ def detect_visual_flag(paragraph: str) -> str | None:
     lowered = paragraph.lower()
     for prefix in VISUAL_PREFIXES:
         if lowered.startswith(prefix):
-            content = normalize_whitespace(paragraph.split(":", 1)[1] if ":" in paragraph else paragraph)
+            content = normalize_whitespace(
+                paragraph.split(":", 1)[1] if ":" in paragraph else paragraph
+            )
             return content
 
-    if any(token in lowered for token in ("chart", "graph", "diagram", "screenshot", "table", "image", "visual")):
+    has_visual_noun = any(
+        re.search(rf"\b{re.escape(noun)}s?\b", lowered) for noun in VISUAL_NOUNS
+    )
+    has_review_hint = any(
+        re.search(rf"\b{re.escape(hint)}\b", lowered) for hint in VISUAL_REVIEW_HINTS
+    )
+    if has_visual_noun and has_review_hint:
         return normalize_whitespace(paragraph)
 
     return None
 
 
-def spoken_line(paragraph: str) -> str:
+def spoken_line(paragraph: str) -> str | None:
     cleaned = normalize_whitespace(paragraph)
+    if cleaned.lower() in SKIP_PARAGRAPHS:
+        return None
+
     visual_flag = detect_visual_flag(cleaned)
     if visual_flag is not None:
         return f"VISUAL FLAG: {visual_flag}"
@@ -97,11 +130,14 @@ def spoken_line(paragraph: str) -> str:
 
 
 def build_script(text: str, intro: str, outro: str) -> str:
-    paragraphs = [
-        spoken_line(paragraph)
-        for paragraph in re.split(r"\n\s*\n+", text.strip())
-        if normalize_whitespace(paragraph)
-    ]
+    paragraphs = []
+    for paragraph in re.split(r"\n\s*\n+", text.strip()):
+        if not normalize_whitespace(paragraph):
+            continue
+        line = spoken_line(paragraph)
+        if line:
+            paragraphs.append(line)
+
     lines = [normalize_whitespace(intro), *paragraphs, normalize_whitespace(outro)]
     return "\n\n".join(line for line in lines if line)
 
