@@ -54,6 +54,8 @@ What they do:
 - the TTS step prefers ElevenLabs, falls back to OpenAI TTS when ElevenLabs credentials/availability are the blocker, and only then falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt`
 
 Convention:
+- put upstream digest text drops under `incoming_digests/`
+- `incoming_digests/` ships with a placeholder file and ignores real local `*.txt` drops by default
 - put generated audio and dry-run artifacts under `out/`
 - `out/` is treated as disposable and is ignored by git except for a placeholder file
 
@@ -104,7 +106,7 @@ python3 scripts/voice_digest_run.py \
   --dry-run
 ```
 
-Or let a scheduler pick the newest digest text from a drop directory:
+Or let a scheduler pick the newest digest text from the repo's default drop directory:
 
 ```bash
 python3 scripts/voice_digest_from_latest.py \
@@ -112,6 +114,8 @@ python3 scripts/voice_digest_from_latest.py \
   --glob '*.txt' \
   --dry-run
 ```
+
+The repo already includes `incoming_digests/.gitkeep` so the expected drop path exists immediately after clone; local digest text files placed there stay untracked by default.
 
 This writes a run folder under `out/runs/YYYY-MM-DD/RUN_ID/` containing:
 - `digest.txt`

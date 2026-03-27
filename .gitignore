@@ -9,5 +9,7 @@ build/
 __pycache__/
 .DS_Store
 .voice_digest_notifier.json
+incoming_digests/*
+!incoming_digests/.gitkeep
 out/*
 !out/.gitkeep

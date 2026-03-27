@@ -11,6 +11,7 @@ from typing import Sequence
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUN_SCRIPT = REPO_ROOT / "scripts" / "voice_digest_run.py"
+DEFAULT_INPUT_DIR = REPO_ROOT / "incoming_digests"
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,6 +67,16 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def format_input_dir_hint(input_dir: Path) -> str:
+    resolved = input_dir.resolve()
+    if resolved == DEFAULT_INPUT_DIR:
+        return (
+            f"default drop directory expected at {input_dir}. "
+            "Create it or drop digest *.txt files there, or pass --input-dir to point at the real upstream source."
+        )
+    return f"pass --input-dir to point at the real upstream source directory: {input_dir}"
+
+
 def newest_file(paths: Sequence[Path]) -> Path:
     if not paths:
         fail("no matching digest files found")
@@ -77,9 +88,14 @@ def main() -> int:
     args = parse_args()
     input_dir = args.input_dir.resolve()
     if not input_dir.is_dir():
-        fail(f"input directory does not exist: {args.input_dir}")
+        fail(f"input directory does not exist: {args.input_dir} ({format_input_dir_hint(args.input_dir)})")
 
     candidates = sorted(path for path in input_dir.glob(args.glob) if path.is_file())
+    if not candidates:
+        fail(
+            f"no matching digest files found in {input_dir} for glob {args.glob!r} "
+            f"({format_input_dir_hint(args.input_dir)})"
+        )
     selected = newest_file(candidates)
 
     command = [
