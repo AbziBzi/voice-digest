@@ -39,6 +39,7 @@ The live-audio message-body mode now follows the same operational pattern:
 Recommended morning-run shape:
 - keep the real destination out of committed docs/scripts
 - set env vars in the scheduler environment or provision `.voice_digest_notifier.json` locally
+- if the upstream digest generator writes somewhere other than the repo default drop, set `VOICE_DIGEST_INPUT_DIR` for `voice_digest_dispatch_job.py` so cron wiring can point at the real source path without growing another flag in the scheduler entry
 - if the preferred live message shape is already known, store `audio_message_mode` alongside the destination in that same local config so cron does not need an extra flag
 - use `scripts/voice_digest_dispatch_job.py` as the scheduler entrypoint once the destination is wired, because it writes stable delivery status artifacts for success and failure
 - consider `--max-age-minutes 180` (or a similar window) in scheduler automation so downstream delivery rejects stale `latest_run.json` artifacts instead of reusing yesterday's bundle by accident

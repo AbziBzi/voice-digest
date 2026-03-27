@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ DEFAULT_PAYLOAD_JSON_PATH = REPO_ROOT / "out" / "delivery_payload.json"
 DEFAULT_STATUS_JSON_PATH = REPO_ROOT / "out" / "delivery_status.json"
 DEFAULT_STATUS_TEXT_PATH = REPO_ROOT / "out" / "delivery_status.txt"
 DEFAULT_CONFIG_PATH = REPO_ROOT / ".voice_digest_notifier.json"
+DEFAULT_INPUT_DIR_ENV = "VOICE_DIGEST_INPUT_DIR"
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,10 +38,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--input-dir",
         type=Path,
-        default=DEFAULT_INPUT_DIR,
         help=(
             "Directory containing digest text files dropped by the upstream digest generator. "
-            "Defaults to ./incoming_digests under the repo root."
+            f"Defaults to ${DEFAULT_INPUT_DIR_ENV} when set, otherwise ./incoming_digests under the repo root."
         ),
     )
     parser.add_argument(
@@ -186,12 +187,21 @@ def load_optional_json(path: Path) -> dict[str, Any] | None:
     return data
 
 
-def build_morning_job_command(args: argparse.Namespace) -> list[str]:
+def resolve_input_dir(args: argparse.Namespace) -> tuple[Path, str]:
+    if args.input_dir is not None:
+        return args.input_dir, "cli"
+    env_input_dir = os.environ.get(DEFAULT_INPUT_DIR_ENV)
+    if isinstance(env_input_dir, str) and env_input_dir.strip():
+        return Path(env_input_dir), "env"
+    return DEFAULT_INPUT_DIR, "default"
+
+
+def build_morning_job_command(args: argparse.Namespace, input_dir: Path) -> list[str]:
     command = [
         sys.executable,
         str(MORNING_JOB_SCRIPT),
         "--input-dir",
-        str(args.input_dir),
+        str(input_dir),
         "--glob",
         args.glob,
         "--runs-dir",
@@ -352,9 +362,15 @@ def render_status_text(status: dict[str, Any]) -> str:
     dispatch = status.get("dispatch")
     if isinstance(dispatch, dict):
         max_age_minutes = dispatch.get("max_age_minutes")
+        input_dir = dispatch.get("input_dir")
+        input_dir_source = dispatch.get("input_dir_source")
         requested_mode = dispatch.get("requested_audio_message_mode")
         resolved_mode = dispatch.get("resolved_audio_message_mode")
         resolved_mode_source = dispatch.get("audio_message_mode_source")
+        if input_dir:
+            lines.append(f"input_dir: {input_dir}")
+        if input_dir_source:
+            lines.append(f"input_dir_source: {input_dir_source}")
         if max_age_minutes is not None:
             lines.append(f"max_age_minutes: {max_age_minutes}")
         if requested_mode:
@@ -423,7 +439,13 @@ def write_status(status: dict[str, Any], status_json_path: Path, status_text_pat
     status_text_path.write_text(render_status_text(status), encoding="utf-8")
 
 
-def build_base_status(args: argparse.Namespace, started_at: str) -> dict[str, Any]:
+def build_base_status(
+    args: argparse.Namespace,
+    started_at: str,
+    *,
+    input_dir: Path,
+    input_dir_source: str,
+) -> dict[str, Any]:
     return {
         "status": "running",
         "stage": "starting",
@@ -442,6 +464,8 @@ def build_base_status(args: argparse.Namespace, started_at: str) -> dict[str, An
             "send": args.send,
             "openclaw_dry_run": args.openclaw_dry_run,
             "tts_dry_run": args.dry_run,
+            "input_dir": str(input_dir),
+            "input_dir_source": input_dir_source,
             "max_age_minutes": args.max_age_minutes,
             "requested_audio_message_mode": args.audio_message_mode,
         },
@@ -472,9 +496,15 @@ def main() -> int:
     ):
         ensure_parent(path)
 
-    status = build_base_status(args, started_at)
+    input_dir, input_dir_source = resolve_input_dir(args)
+    status = build_base_status(
+        args,
+        started_at,
+        input_dir=input_dir,
+        input_dir_source=input_dir_source,
+    )
 
-    morning_command = build_morning_job_command(args)
+    morning_command = build_morning_job_command(args, input_dir)
     status["commands"]["morning_job"] = command_preview(morning_command)
     status["stage"] = "morning_job"
     morning_result = run_command(morning_command)

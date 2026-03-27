@@ -238,6 +238,17 @@ python3 scripts/voice_digest_dispatch_job.py \
   --openclaw-dry-run
 ```
 
+If cron should point at a different upstream drop path without carrying another CLI flag, set:
+
+```bash
+export VOICE_DIGEST_INPUT_DIR=/absolute/path/to/upstream/digests
+python3 scripts/voice_digest_dispatch_job.py \
+  --send \
+  --openclaw-dry-run
+```
+
+`delivery_status.json` / `delivery_status.txt` now record both the resolved `input_dir` and whether it came from `cli`, `env`, or the repo `default`.
+
 That same entrypoint can carry the freshness guard through to the morning handoff + payload validation steps:
 
 ```bash

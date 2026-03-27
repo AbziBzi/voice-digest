@@ -10,6 +10,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 
 ## Entries
 
+### 2026-03-28
+- Tightened scheduler input wiring at the top-level entrypoint: `scripts/voice_digest_dispatch_job.py` can now resolve the upstream digest drop from `VOICE_DIGEST_INPUT_DIR` when `--input-dir` is omitted, and `delivery_status.json` / `delivery_status.txt` now record both the resolved `input_dir` and whether it came from `cli`, `env`, or the repo default.
+- Added regression coverage for both behaviors in `tests/test_voice_digest_dispatch_job.py`, including env-vs-default input resolution and a notifier-failure status artifact that preserves the env-resolved input path for cron debugging.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed, and a repo-root `VOICE_DIGEST_INPUT_DIR=<temp>/upstream python3 scripts/voice_digest_dispatch_job.py --dry-run --channel signal --target +37060000000` run completed successfully while `out/delivery_status.txt` showed `input_dir_source: env`.
+- Learned: the remaining upstream-input work is now more operationally legible for cron, because the scheduler status artifact says not just which digest path was used but where that path came from.
+- Next step: set `VOICE_DIGEST_INPUT_DIR` plus Edwin's real notifier destination in the scheduler environment, then run one intended-config `voice_digest_dispatch_job.py --send --openclaw-dry-run` before the first true live dispatch.
+
 ### 2026-03-27
 - Preserved notifier setup diagnostics on real send-path failures: `scripts/voice_digest_openclaw_notifier.py --json` now includes the same destination/config/env/artifact diagnostics block for `openclaw` runtime/send failures that it already emitted for missing-destination config failures, so morning triage keeps the wiring context even when transport execution is the part that breaks.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed, and a repo-root notifier run under `PATH=/usr/bin:/bin` with `--send --openclaw-dry-run --json` now returns both the missing-CLI error and the full diagnostics block.

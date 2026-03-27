@@ -19,6 +19,27 @@ spec.loader.exec_module(module)
 
 
 class VoiceDigestDispatchJobTests(unittest.TestCase):
+    def test_resolve_input_dir_prefers_cli_then_env_then_default(self) -> None:
+        cli_args = Namespace(input_dir=Path("/tmp/cli-digests"))
+        self.assertEqual(
+            module.resolve_input_dir(cli_args),
+            (Path("/tmp/cli-digests"), "cli"),
+        )
+
+        env_args = Namespace(input_dir=None)
+        with mock.patch.dict(module.os.environ, {module.DEFAULT_INPUT_DIR_ENV: "/tmp/env-digests"}, clear=False):
+            self.assertEqual(
+                module.resolve_input_dir(env_args),
+                (Path("/tmp/env-digests"), "env"),
+            )
+
+        default_args = Namespace(input_dir=None)
+        with mock.patch.dict(module.os.environ, {}, clear=True):
+            self.assertEqual(
+                module.resolve_input_dir(default_args),
+                (module.DEFAULT_INPUT_DIR, "default"),
+            )
+
     def test_summarize_command_failure_prefers_structured_json_error(self) -> None:
         result = CompletedProcess(
             args=["python3", "notifier"],
@@ -39,7 +60,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
             args = Namespace(
-                input_dir=tmp / "incoming_digests",
+                input_dir=None,
                 glob="*.txt",
                 runs_dir=tmp / "out" / "runs",
                 state_path=tmp / "out" / "latest_run.json",
@@ -121,7 +142,11 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 },
             }
 
-            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.dict(
+                module.os.environ,
+                {module.DEFAULT_INPUT_DIR_ENV: str(tmp / "wired-digests")},
+                clear=False,
+            ), mock.patch.object(
                 module,
                 "run_command",
                 side_effect=[morning_result, notifier_result],
@@ -138,6 +163,8 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["error"]["detail"], "gateway unavailable")
             self.assertEqual(status["destination"]["channel"], "signal")
             self.assertEqual(status["destination"]["source"], "config")
+            self.assertEqual(status["dispatch"]["input_dir"], str(tmp / "wired-digests"))
+            self.assertEqual(status["dispatch"]["input_dir_source"], "env")
             self.assertEqual(status["dispatch"]["resolved_audio_message_mode"], "caption")
             self.assertEqual(status["dispatch"]["audio_message_mode_source"], "config")
             self.assertEqual(status["summary"]["run_age_minutes"], 12.5)
@@ -146,6 +173,8 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["diagnostics"]["config_has_channel"], True)
 
             status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn(f"input_dir: {tmp / 'wired-digests'}", status_text)
+            self.assertIn("input_dir_source: env", status_text)
             self.assertIn("run_age_minutes: 12.5", status_text)
             self.assertIn("selected_input_age_minutes: 9.0", status_text)
             self.assertIn("selected_input_size_bytes: 321", status_text)
