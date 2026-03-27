@@ -151,6 +151,23 @@ def render_text(handoff: dict[str, object]) -> str:
     )
     lines.append(f"- Delivery target: {delivery['delivery_target']}")
     lines.append(f"- Selected input: {run['selected_input']}")
+
+    run_age_minutes = run.get("age_minutes")
+    if isinstance(run_age_minutes, (int, float)):
+        lines.append(f"- Run age: {run_age_minutes:.1f} minutes")
+
+    selected_input_details = summary.get("selected_input_details")
+    if isinstance(selected_input_details, dict):
+        modified_at = selected_input_details.get("modified_at")
+        age_minutes = selected_input_details.get("age_minutes")
+        size_bytes = selected_input_details.get("size_bytes")
+        if modified_at:
+            lines.append(f"- Selected input modified: {modified_at}")
+        if isinstance(age_minutes, (int, float)):
+            lines.append(f"- Selected input age: {age_minutes:.1f} minutes")
+        if isinstance(size_bytes, int):
+            lines.append(f"- Selected input size: {size_bytes} bytes")
+
     lines.append(f"- Spoken script: {artifacts['spoken_script']}")
 
     source_digest = summary.get("source_digest")

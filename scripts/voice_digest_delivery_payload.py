@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -59,6 +60,44 @@ def read_preview(path: Path, limit: int = 280) -> str:
     return text[: limit - 3].rstrip() + "..."
 
 
+def parse_timestamp(value: object, label: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"missing {label}")
+    normalized = value.replace("Z", "+00:00")
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(f"invalid {label}: {value!r}") from exc
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def age_minutes_from(timestamp: datetime) -> float:
+    return round((datetime.now(timezone.utc) - timestamp).total_seconds() / 60, 1)
+
+
+def describe_selected_input(selected_input: str) -> dict[str, object]:
+    selected_path = Path(selected_input)
+    details: dict[str, object] = {
+        "path": selected_input,
+        "exists": selected_path.is_file(),
+    }
+    if not selected_path.is_file():
+        return details
+
+    stat = selected_path.stat()
+    modified_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+    details.update(
+        {
+            "size_bytes": stat.st_size,
+            "modified_at": modified_at.isoformat(),
+            "age_minutes": age_minutes_from(modified_at),
+        }
+    )
+    return details
+
+
 def build_delivery_payload(
     state_path: Path,
     require_mode: str | None = None,
@@ -82,6 +121,7 @@ def build_delivery_payload(
     timestamp = state.get("timestamp")
     if not isinstance(timestamp, str) or not timestamp.strip():
         raise ValueError("missing timestamp")
+    run_timestamp = parse_timestamp(timestamp, "timestamp")
 
     mode = validated["mode"]
     delivery_target = (
@@ -97,6 +137,7 @@ def build_delivery_payload(
         "delivery_target": delivery_target,
         "run": {
             "timestamp": timestamp,
+            "age_minutes": age_minutes_from(run_timestamp),
             "run_dir": str(validated["run_dir"]),
             "state_path": str(validated["state_path"]),
             "manifest": str(validated["manifest_path"]),
@@ -112,6 +153,7 @@ def build_delivery_payload(
             "spoken_preview": spoken_preview,
             "voice_id_override": inputs.get("voice_id_override"),
             "model_id_override": inputs.get("model_id_override"),
+            "selected_input_details": describe_selected_input(selected_input),
         },
     }
 
