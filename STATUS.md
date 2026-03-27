@@ -12,6 +12,7 @@ Build a genuinely useful morning voice-digest workflow for Edwin: short spoken b
 - Scheduler-friendly run bundling works via `scripts/voice_digest_run.py`.
 - Dispatch status artifacts now include the underlying failing notifier/morning-job error detail, so missing destination wiring and similar cron issues surface directly in `out/delivery_status.*`.
 - The OpenClaw notifier send path now fails cleanly when the `openclaw` CLI is missing from `PATH`, returning a structured operational error instead of a Python traceback.
+- OpenClaw send failures now stay structured in `--json` mode, so dispatch status artifacts can preserve the notifier plan plus a clear send-error summary instead of degrading into generic stderr parsing.
 - Delivery payloads and morning handoffs now surface run age plus selected-input freshness details, so morning triage can tell at a glance whether the upstream digest and generated artifact are actually fresh.
 
 ## Current gap
@@ -27,7 +28,7 @@ The project can now bundle a digest run into a dated artifact folder with a mani
 1. Point the new OpenClaw notifier at Edwin's real Signal/OpenClaw target so the overnight summary is actually surfaced at day start.
 2. Exercise one true end-to-end morning run with fresh input and a delivered artifact or fallback.
 3. Create a robust spoken-digest format for the real morning digest output.
-4. Tighten the scheduler contract so morning failures surface clearly without manual log inspection. (Now improved for dispatch-status artifacts and missing-CLI notifier failures; remaining work is exercising the real wired destination.)
+4. Tighten the scheduler contract so morning failures surface clearly without manual log inspection. (Now improved for dispatch-status artifacts, missing-CLI notifier failures, and structured OpenClaw send-failure reporting; remaining work is exercising the real wired destination.)
 5. Exercise both live-mode message-body variants against Edwin's real destination and choose whether `full` or `caption` should be the scheduler default.
 
 ## Immediate next step

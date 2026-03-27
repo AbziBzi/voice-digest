@@ -246,10 +246,23 @@ def render_preview(plan: dict[str, object]) -> str:
     return " ".join(subprocess.list2cmdline([part]) for part in command)
 
 
-def render_error_json(message: str, plan: dict[str, object] | None = None) -> str:
+def render_error_json(
+    message: str,
+    plan: dict[str, object] | None = None,
+    *,
+    returncode: int | None = None,
+    stdout: str | None = None,
+    stderr: str | None = None,
+) -> str:
     payload: dict[str, object] = {"status": "error", "error": message}
     if plan is not None:
         payload["plan"] = plan
+    if returncode is not None:
+        payload["returncode"] = returncode
+    if stdout:
+        payload["stdout"] = stdout
+    if stderr:
+        payload["stderr"] = stderr
     return json.dumps(payload, indent=2) + "\n"
 
 
@@ -322,11 +335,23 @@ def main() -> int:
             print(f"error: {exc}", file=sys.stderr)
         return 1
     except subprocess.CalledProcessError as exc:
-        if exc.stdout:
-            sys.stdout.write(exc.stdout)
-        if exc.stderr:
-            sys.stderr.write(exc.stderr)
-        print(f"error: openclaw message send failed with exit code {exc.returncode}", file=sys.stderr)
+        message = f"openclaw message send failed with exit code {exc.returncode}"
+        if args.json:
+            sys.stdout.write(
+                render_error_json(
+                    message,
+                    plan,
+                    returncode=exc.returncode,
+                    stdout=exc.stdout.strip() if exc.stdout else None,
+                    stderr=exc.stderr.strip() if exc.stderr else None,
+                )
+            )
+        else:
+            if exc.stdout:
+                sys.stdout.write(exc.stdout)
+            if exc.stderr:
+                sys.stderr.write(exc.stderr)
+            print(f"error: {message}", file=sys.stderr)
         return 1
 
     if args.json:

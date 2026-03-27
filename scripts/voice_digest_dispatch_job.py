@@ -264,12 +264,34 @@ def extract_error_summary(*texts: str) -> str | None:
     return None
 
 
-def summarize_command_failure(result: subprocess.CompletedProcess[str], stage: str) -> dict[str, Any]:
+def summarize_command_failure(
+    result: subprocess.CompletedProcess[str],
+    stage: str,
+    *,
+    parsed_json: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    message = f"{stage} failed with exit code {result.returncode}"
     detail = extract_error_summary(result.stderr, result.stdout)
+
+    if isinstance(parsed_json, dict):
+        json_error = parsed_json.get("error")
+        if isinstance(json_error, str) and json_error.strip():
+            detail = json_error.strip()
+        json_returncode = parsed_json.get("returncode")
+        if isinstance(json_returncode, int):
+            message = f"{stage} failed with exit code {json_returncode}"
+        stdout = parsed_json.get("stdout")
+        stderr = parsed_json.get("stderr")
+        if not detail:
+            detail = extract_error_summary(
+                stderr if isinstance(stderr, str) else "",
+                stdout if isinstance(stdout, str) else "",
+            )
+
     failure = {
         "stage": stage,
         "returncode": result.returncode,
-        "message": f"{stage} failed with exit code {result.returncode}",
+        "message": message,
     }
     if detail:
         failure["detail"] = detail
@@ -488,7 +510,11 @@ def main() -> int:
 
     if notifier_result.returncode != 0:
         status["status"] = "failed"
-        status["error"] = summarize_command_failure(notifier_result, notifier_stage)
+        status["error"] = summarize_command_failure(
+            notifier_result,
+            notifier_stage,
+            parsed_json=notifier_json,
+        )
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
         if morning_result.stdout:
