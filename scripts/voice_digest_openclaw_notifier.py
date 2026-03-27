@@ -109,6 +109,32 @@ def load_text(path: Path) -> str:
     return text
 
 
+def build_destination_diagnostics(
+    args: argparse.Namespace,
+    config: dict[str, object],
+) -> dict[str, object]:
+    config_channel = config.get("channel")
+    config_target = config.get("target")
+    env_channel = os.environ.get(DEFAULT_CHANNEL_ENV)
+    env_target = os.environ.get(DEFAULT_TARGET_ENV)
+    env_audio_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
+
+    return {
+        "config_path": str(args.config_path),
+        "config_exists": args.config_path.exists(),
+        "config_has_channel": isinstance(config_channel, str) and bool(config_channel.strip()),
+        "config_has_target": isinstance(config_target, str) and bool(config_target.strip()),
+        "env_channel_set": bool(env_channel),
+        "env_target_set": bool(env_target),
+        "env_audio_message_mode_set": bool(env_audio_mode),
+        "cli_channel_set": bool(args.channel),
+        "cli_target_set": bool(args.target),
+        "cli_audio_message_mode_set": bool(args.audio_message_mode),
+        "payload_path": str(args.payload_path),
+        "handoff_text_path": str(args.handoff_text_path),
+    }
+
+
 def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> tuple[str, str, str]:
     config_channel = config.get("channel")
     config_target = config.get("target")
@@ -253,6 +279,7 @@ def render_error_json(
     returncode: int | None = None,
     stdout: str | None = None,
     stderr: str | None = None,
+    diagnostics: dict[str, object] | None = None,
 ) -> str:
     payload: dict[str, object] = {"status": "error", "error": message}
     if plan is not None:
@@ -263,6 +290,8 @@ def render_error_json(
         payload["stdout"] = stdout
     if stderr:
         payload["stderr"] = stderr
+    if diagnostics is not None:
+        payload["diagnostics"] = diagnostics
     return json.dumps(payload, indent=2) + "\n"
 
 
@@ -289,11 +318,13 @@ def run_openclaw(plan: dict[str, object], openclaw_dry_run: bool) -> subprocess.
 
 def main() -> int:
     args = parse_args()
+    diagnostics: dict[str, object] | None = None
 
     try:
         payload = load_json(args.payload_path)
         handoff_text = load_text(args.handoff_text_path)
         config = load_optional_config(args.config_path)
+        diagnostics = build_destination_diagnostics(args, config)
         channel, target, destination_source = resolve_destination(args, config)
         audio_message_mode, audio_message_mode_source = resolve_audio_message_mode(args, config)
         plan = build_message_plan(
@@ -306,7 +337,10 @@ def main() -> int:
         )
         plan["audio_message_mode_source"] = audio_message_mode_source
     except (OSError, json.JSONDecodeError, ValueError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
+        if args.json:
+            sys.stdout.write(render_error_json(str(exc), diagnostics=diagnostics))
+        else:
+            print(f"error: {exc}", file=sys.stderr)
         return 1
 
     if not args.send:

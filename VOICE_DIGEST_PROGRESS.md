@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-27
+- Hardened the final notifier-wiring debug path: `scripts/voice_digest_openclaw_notifier.py --json` now emits structured setup diagnostics when destination wiring is missing (config path/presence, whether config has channel/target, whether destination env vars are set, whether CLI overrides were supplied, and which payload/handoff files it inspected), and `scripts/voice_digest_dispatch_job.py` now preserves and renders those diagnostics in `delivery_status.json` / `delivery_status.txt`.
+- Added regression coverage for both layers: notifier tests lock in the new structured diagnostics on missing destination wiring, and dispatch tests confirm those diagnostics survive into the stable status artifact alongside resolved destination/mode fields.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py scripts/voice_digest_dispatch_job.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed, and a repo-root `python3 scripts/voice_digest_openclaw_notifier.py --json` run now returns an explicit diagnostics block showing that no config file or destination env vars are present.
+- Learned: the remaining delivery-path uncertainty is now less about “why did notifier wiring fail?” and more about the genuinely missing live config/input, because the failure artifact can say which configuration surfaces were actually populated.
+- Next step: once the real upstream digest drop or `--input-dir` is known, run one scheduler-facing `voice_digest_dispatch_job.py --send --openclaw-dry-run` against that intended input plus Edwin’s real destination wiring, then do one true live dispatch.
+
+### 2026-03-27
 - Fixed `scripts/voice_digest_checkpoint.py` so overnight checkpoint / morning handoff summaries now treat the topmost dated section in `VOICE_DIGEST_PROGRESS.md` as the latest entry, matching the file’s newest-first layout instead of accidentally surfacing the older trailing section.
 - Added `tests/test_voice_digest_checkpoint.py` to lock in that newest-first progress parsing behavior.
 - Verification passed in three layers: the new unit test succeeded, the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed, and a repo-root `voice_digest_dispatch_job.py --dry-run --send --openclaw-dry-run` run regenerated `out/morning_handoff.txt` with a `Latest progress` line from today’s 2026-03-27 section rather than the stale 2026-03-25 block.

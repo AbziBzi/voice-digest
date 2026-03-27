@@ -365,6 +365,26 @@ def render_status_text(status: dict[str, Any]) -> str:
             for line in str(detail).splitlines():
                 lines.append(f"  {line}")
 
+    diagnostics = status.get("diagnostics")
+    if isinstance(diagnostics, dict):
+        lines.append("diagnostics:")
+        for key in (
+            "config_path",
+            "config_exists",
+            "config_has_channel",
+            "config_has_target",
+            "env_channel_set",
+            "env_target_set",
+            "env_audio_message_mode_set",
+            "cli_channel_set",
+            "cli_target_set",
+            "cli_audio_message_mode_set",
+            "payload_path",
+            "handoff_text_path",
+        ):
+            if key in diagnostics:
+                lines.append(f"  {key}: {diagnostics[key]}")
+
     artifacts = status.get("artifacts")
     if isinstance(artifacts, dict):
         lines.append("artifacts:")
@@ -498,6 +518,9 @@ def main() -> int:
 
     if notifier_json:
         status["notifier_result"] = notifier_json
+        diagnostics = notifier_json.get("diagnostics")
+        if isinstance(diagnostics, dict):
+            status["diagnostics"] = diagnostics
         plan = notifier_json.get("plan") if args.send else notifier_json
         if isinstance(plan, dict):
             status["destination"] = {

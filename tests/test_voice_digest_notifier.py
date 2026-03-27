@@ -94,6 +94,56 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertEqual(result["plan"]["audio_message_mode"], "caption")
             self.assertEqual(result["plan"]["channel"], "signal")
 
+    def test_main_emits_destination_diagnostics_when_destination_is_missing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            payload_path.write_text(
+                json.dumps(
+                    {
+                        "mode": "live",
+                        "notifier_action": "send_audio",
+                        "delivery_kind": "audio",
+                        "delivery_target": str(tmp / "digest.mp3"),
+                        "run": {"selected_input": "digest.txt"},
+                        "summary": {
+                            "spoken_preview": "Quick preview",
+                            "source_digest": "Daily AI digest",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+                json=True,
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ) as stdout:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["status"], "error")
+            self.assertIn("destination is not configured", result["error"])
+            self.assertEqual(result["diagnostics"]["config_exists"], False)
+            self.assertEqual(result["diagnostics"]["env_channel_set"], False)
+            self.assertEqual(result["diagnostics"]["env_target_set"], False)
+            self.assertEqual(result["diagnostics"]["cli_channel_set"], False)
+            self.assertEqual(result["diagnostics"]["cli_target_set"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

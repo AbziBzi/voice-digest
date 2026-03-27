@@ -262,7 +262,7 @@ By default this also writes:
 - `out/delivery_status.json`
 - `out/delivery_status.txt`
 
-`delivery_status.json` records whether the failure happened in the morning build or notifier stage, plus the selected input, mode, destination when known, and the stable artifact paths a scheduler can inspect.
+`delivery_status.json` records whether the failure happened in the morning build or notifier stage, plus the selected input, mode, destination when known, notifier setup diagnostics (for example whether the local config file exists and whether destination env vars were set), and the stable artifact paths a scheduler can inspect.
 
 Optional environment variables:
 - `ELEVENLABS_API_KEY` for real synthesis

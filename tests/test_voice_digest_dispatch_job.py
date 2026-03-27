@@ -73,6 +73,20 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "status": "error",
                 "error": "gateway unavailable",
                 "returncode": 9,
+                "diagnostics": {
+                    "config_path": str(tmp / ".voice_digest_notifier.json"),
+                    "config_exists": True,
+                    "config_has_channel": True,
+                    "config_has_target": True,
+                    "env_channel_set": False,
+                    "env_target_set": False,
+                    "env_audio_message_mode_set": False,
+                    "cli_channel_set": False,
+                    "cli_target_set": False,
+                    "cli_audio_message_mode_set": True,
+                    "payload_path": str(tmp / "out" / "delivery_payload.json"),
+                    "handoff_text_path": str(tmp / "out" / "morning_handoff.txt"),
+                },
                 "plan": {
                     "channel": "signal",
                     "target": "+37060000000",
@@ -114,6 +128,8 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["destination"]["source"], "config")
             self.assertEqual(status["dispatch"]["resolved_audio_message_mode"], "caption")
             self.assertEqual(status["dispatch"]["audio_message_mode_source"], "config")
+            self.assertEqual(status["diagnostics"]["config_exists"], True)
+            self.assertEqual(status["diagnostics"]["config_has_channel"], True)
 
 
 if __name__ == "__main__":
