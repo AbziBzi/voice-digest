@@ -314,6 +314,8 @@ def render_status_text(status: dict[str, Any]) -> str:
         selected_input = summary.get("selected_input")
         notifier_action = summary.get("notifier_action")
         delivery_target = summary.get("delivery_target")
+        run_age_minutes = summary.get("run_age_minutes")
+        selected_input_details = summary.get("selected_input_details")
         if mode:
             lines.append(f"mode: {mode}")
         if selected_input:
@@ -322,6 +324,18 @@ def render_status_text(status: dict[str, Any]) -> str:
             lines.append(f"notifier_action: {notifier_action}")
         if delivery_target:
             lines.append(f"delivery_target: {delivery_target}")
+        if run_age_minutes is not None:
+            lines.append(f"run_age_minutes: {run_age_minutes}")
+        if isinstance(selected_input_details, dict):
+            input_age = selected_input_details.get("age_minutes")
+            input_modified = selected_input_details.get("modified_at")
+            input_size = selected_input_details.get("size_bytes")
+            if input_age is not None:
+                lines.append(f"selected_input_age_minutes: {input_age}")
+            if input_modified:
+                lines.append(f"selected_input_modified_at: {input_modified}")
+            if input_size is not None:
+                lines.append(f"selected_input_size_bytes: {input_size}")
 
     destination = status.get("destination")
     if isinstance(destination, dict):
@@ -499,12 +513,20 @@ def main() -> int:
         run_summary = payload.get("run")
         if isinstance(run_summary, dict):
             status["run"] = run_summary
+        payload_summary = payload.get("summary")
+        selected_input_details = (
+            payload_summary.get("selected_input_details")
+            if isinstance(payload_summary, dict)
+            else None
+        )
         status["summary"] = {
             "mode": payload.get("mode"),
             "notifier_action": payload.get("notifier_action"),
             "delivery_kind": payload.get("delivery_kind"),
             "delivery_target": payload.get("delivery_target"),
             "selected_input": run_summary.get("selected_input") if isinstance(run_summary, dict) else None,
+            "run_age_minutes": run_summary.get("age_minutes") if isinstance(run_summary, dict) else None,
+            "selected_input_details": selected_input_details if isinstance(selected_input_details, dict) else None,
         }
 
     notifier_json: dict[str, Any] | None = None

@@ -106,7 +106,19 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "notifier_action": "send_audio",
                 "delivery_kind": "audio",
                 "delivery_target": str(tmp / "out" / "runs" / "digest.mp3"),
-                "run": {"selected_input": str(tmp / "incoming_digests" / "digest.txt")},
+                "run": {
+                    "selected_input": str(tmp / "incoming_digests" / "digest.txt"),
+                    "age_minutes": 12.5,
+                },
+                "summary": {
+                    "selected_input_details": {
+                        "path": str(tmp / "incoming_digests" / "digest.txt"),
+                        "exists": True,
+                        "size_bytes": 321,
+                        "modified_at": "2026-03-27T18:00:00+00:00",
+                        "age_minutes": 9.0,
+                    }
+                },
             }
 
             with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
@@ -128,8 +140,15 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["destination"]["source"], "config")
             self.assertEqual(status["dispatch"]["resolved_audio_message_mode"], "caption")
             self.assertEqual(status["dispatch"]["audio_message_mode_source"], "config")
+            self.assertEqual(status["summary"]["run_age_minutes"], 12.5)
+            self.assertEqual(status["summary"]["selected_input_details"]["age_minutes"], 9.0)
             self.assertEqual(status["diagnostics"]["config_exists"], True)
             self.assertEqual(status["diagnostics"]["config_has_channel"], True)
+
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("run_age_minutes: 12.5", status_text)
+            self.assertIn("selected_input_age_minutes: 9.0", status_text)
+            self.assertIn("selected_input_size_bytes: 321", status_text)
 
 
 if __name__ == "__main__":
