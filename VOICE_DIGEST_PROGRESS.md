@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Tightened `scripts/voice_digest_dispatch_job.py` handoff guidance for the easy-to-misread success case where dispatch only proves `send_text_fallback` because TTS is still running with `--dry-run`; the stable `next_action` now explicitly says to rerun without `--dry-run` and verify a real audio artifact before the first live morning send.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for that new success-path guidance while preserving the existing send-path dry-run hint for genuine audio-ready runs.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (7 tests), and a temp dispatch run with `VOICE_DIGEST_INPUT_DIR=<temp>/upstream python3 scripts/voice_digest_dispatch_job.py --dry-run --channel signal --target +37060000000` now writes `delivery_status.txt` with a `next_action:` line that calls out the missing real-audio proof instead of implying the remaining work is only destination wiring.
+- Learned: a green-ish scheduler run can still leave the core product blocker unsolved if it never synthesized audio; the morning artifact needs to distinguish “dispatch path works” from “voice digest is actually ready.”
+- Next step: run the intended-config dispatch without `--dry-run` once the real input path and destination wiring are in place, confirm it produces audio rather than a dry-run note, then do one true live delivery.
+
+### 2026-03-28
 - Added morning-readable `next_action` guidance to `scripts/voice_digest_dispatch_job.py`, and threaded it into both `delivery_status.json` and `delivery_status.txt` for common states: missing input drop, missing destination wiring, missing `openclaw` CLI, preview-only success, and send-path dry-run success.
 - Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for the new hinting logic, including missing-input, missing-destination (preview and send), successful send dry-run, and status-artifact rendering.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest discover -s tests -p 'test_*.py'` passed (14 tests), and a temp end-to-end dispatch run with a sample digest now writes `delivery_status.txt` with a concrete `next_action:` line instead of only raw notifier failure text.

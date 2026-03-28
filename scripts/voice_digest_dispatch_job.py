@@ -317,6 +317,11 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
     diagnostics = status.get("diagnostics")
     diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
 
+    summary = status.get("summary")
+    summary = summary if isinstance(summary, dict) else {}
+    notifier_action = summary.get("notifier_action")
+    delivery_kind = summary.get("delivery_kind")
+
     error = status.get("error")
     error = error if isinstance(error, dict) else {}
     detail = error.get("detail")
@@ -360,6 +365,16 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
         return "Inspect the captured error detail in delivery_status.json and rerun only after the blocked stage is fixed."
 
     if status.get("status") == "succeeded":
+        if notifier_action == "send_text_fallback" and delivery_kind == "dry-run-note":
+            if dispatch.get("tts_dry_run"):
+                return (
+                    "Dispatch verification only reached the text fallback because TTS is still running with --dry-run; "
+                    "rerun without --dry-run to verify a real audio artifact before the first live morning delivery."
+                )
+            return (
+                "Dispatch completed with a text fallback instead of a real audio artifact; ensure the live TTS provider path is available, "
+                "then rerun before relying on the automated morning voice digest."
+            )
         if dispatch.get("send") and dispatch.get("openclaw_dry_run"):
             return "Send-path verification passed; the next milestone is one true live dispatch run without --openclaw-dry-run once the destination/input wiring is confirmed."
         if dispatch.get("send"):

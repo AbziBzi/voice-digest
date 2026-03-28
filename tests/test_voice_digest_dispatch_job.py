@@ -244,12 +244,36 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             "Populate /tmp/incoming_digests with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun the dispatch job.",
         )
 
+    def test_derive_next_action_flags_tts_dry_run_text_fallback_after_success(self) -> None:
+        status = {
+            "status": "succeeded",
+            "dispatch": {
+                "tts_dry_run": True,
+                "send": False,
+                "openclaw_dry_run": False,
+            },
+            "summary": {
+                "notifier_action": "send_text_fallback",
+                "delivery_kind": "dry-run-note",
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Dispatch verification only reached the text fallback because TTS is still running with --dry-run; rerun without --dry-run to verify a real audio artifact before the first live morning delivery.",
+        )
+
     def test_derive_next_action_guides_after_successful_send_dry_run(self) -> None:
         status = {
             "status": "succeeded",
             "dispatch": {
                 "send": True,
                 "openclaw_dry_run": True,
+                "tts_dry_run": False,
+            },
+            "summary": {
+                "notifier_action": "send_audio",
+                "delivery_kind": "audio",
             },
         }
 
