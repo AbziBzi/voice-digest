@@ -146,6 +146,57 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertEqual(result["diagnostics"]["cli_channel_set"], False)
             self.assertEqual(result["diagnostics"]["cli_target_set"], False)
 
+    def test_main_preserves_diagnostics_when_config_json_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            config_path = tmp / ".voice_digest_notifier.json"
+            payload_path.write_text(
+                json.dumps(
+                    {
+                        "mode": "live",
+                        "notifier_action": "send_audio",
+                        "delivery_kind": "audio",
+                        "delivery_target": str(tmp / "digest.mp3"),
+                        "run": {"selected_input": "digest.txt"},
+                        "summary": {
+                            "spoken_preview": "Quick preview",
+                            "source_digest": "Daily AI digest",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+            config_path.write_text('{"channel": "signal",', encoding="utf-8")
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel=None,
+                target=None,
+                config_path=config_path,
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+                json=True,
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ) as stdout:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["status"], "error")
+            self.assertEqual(result["diagnostics"]["config_exists"], True)
+            self.assertIn("config_load_error", result["diagnostics"])
+            self.assertIn(str(config_path), result["diagnostics"]["config_load_error"])
+            self.assertEqual(result["diagnostics"]["config_has_channel"], False)
+            self.assertEqual(result["diagnostics"]["config_has_target"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

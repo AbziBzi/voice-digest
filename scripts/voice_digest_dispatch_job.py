@@ -345,6 +345,8 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
         )
 
         if error.get("stage") == "notifier_send":
+            if diagnostics.get("config_load_error"):
+                return "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun with --send --openclaw-dry-run."
             if "openclaw cli is not available" in detail_text or "openclaw cli could not be executed" in detail_text:
                 return "Ensure the openclaw CLI is installed and available on PATH for the scheduler environment, then rerun with --send --openclaw-dry-run."
             if missing_destination:
@@ -355,6 +357,8 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
             return "Inspect the notifier send error detail, fix the delivery wiring or transport issue, then rerun with --send --openclaw-dry-run."
 
         if error.get("stage") == "notifier_preview":
+            if diagnostics.get("config_load_error"):
+                return "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun the preview or send path."
             if missing_destination:
                 return (
                     "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / "
@@ -493,6 +497,7 @@ def render_status_text(status: dict[str, Any]) -> str:
             "config_exists",
             "config_has_channel",
             "config_has_target",
+            "config_load_error",
             "env_channel_set",
             "env_target_set",
             "env_audio_message_mode_set",

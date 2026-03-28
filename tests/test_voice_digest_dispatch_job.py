@@ -238,6 +238,134 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun the preview or send path.",
         )
 
+    def test_derive_next_action_flags_malformed_config(self) -> None:
+        send_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_send",
+                "detail": "Expecting property name enclosed in double quotes",
+            },
+            "diagnostics": {
+                "config_exists": True,
+                "config_load_error": "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+                "config_has_channel": False,
+                "config_has_target": False,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(send_status),
+            "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun with --send --openclaw-dry-run.",
+        )
+
+        preview_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_preview",
+                "detail": "Expecting property name enclosed in double quotes",
+            },
+            "diagnostics": {
+                "config_exists": True,
+                "config_load_error": "Expecting property name enclosed in double quotes: line 1 column 2 (char 1)",
+                "config_has_channel": False,
+                "config_has_target": False,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(preview_status),
+            "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun the preview or send path.",
+        )
+
+    def test_main_preserves_config_load_error_in_status_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            args = Namespace(
+                input_dir=None,
+                glob="*.txt",
+                runs_dir=tmp / "out" / "runs",
+                state_path=tmp / "out" / "latest_run.json",
+                handoff_text_path=tmp / "out" / "morning_handoff.txt",
+                handoff_json_path=tmp / "out" / "morning_handoff.json",
+                payload_json_path=tmp / "out" / "delivery_payload.json",
+                status_json_path=tmp / "out" / "delivery_status.json",
+                status_text_path=tmp / "out" / "delivery_status.txt",
+                run_id=None,
+                intro=None,
+                outro=None,
+                voice_id=None,
+                model_id=None,
+                dry_run=False,
+                max_age_minutes=None,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+            )
+
+            morning_result = CompletedProcess(
+                args=["python3", "morning"],
+                returncode=0,
+                stdout="morning ok\n",
+                stderr="",
+            )
+            notifier_payload = {
+                "status": "error",
+                "error": f"Expecting property name enclosed in double quotes: line 1 column 2 (char 1) in {tmp / '.voice_digest_notifier.json'}",
+                "diagnostics": {
+                    "config_path": str(tmp / ".voice_digest_notifier.json"),
+                    "config_exists": True,
+                    "config_has_channel": False,
+                    "config_has_target": False,
+                    "config_load_error": f"Expecting property name enclosed in double quotes: line 1 column 2 (char 1) in {tmp / '.voice_digest_notifier.json'}",
+                    "env_channel_set": False,
+                    "env_target_set": False,
+                    "env_audio_message_mode_set": False,
+                    "cli_channel_set": False,
+                    "cli_target_set": False,
+                    "cli_audio_message_mode_set": False,
+                    "payload_path": str(tmp / "out" / "delivery_payload.json"),
+                    "handoff_text_path": str(tmp / "out" / "morning_handoff.txt"),
+                },
+            }
+            notifier_result = CompletedProcess(
+                args=["python3", "notifier"],
+                returncode=1,
+                stdout=json.dumps(notifier_payload),
+                stderr="",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module,
+                "run_command",
+                side_effect=[morning_result, notifier_result],
+            ), mock.patch.object(module, "load_optional_json", return_value=None), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ), mock.patch("sys.stderr", new_callable=io.StringIO):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            status = json.loads(args.status_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["diagnostics"]["config_exists"], True)
+            self.assertIn("config_load_error", status["diagnostics"])
+            self.assertEqual(
+                status["next_action"],
+                "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun the preview or send path.",
+            )
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("config_load_error:", status_text)
+            self.assertIn("next_action: Fix the malformed .voice_digest_notifier.json", status_text)
+
     def test_derive_next_action_flags_missing_input_drop(self) -> None:
         status = {
             "status": "failed",

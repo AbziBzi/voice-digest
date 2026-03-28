@@ -90,7 +90,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_json(path: Path) -> dict[str, object]:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON in {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise ValueError(f"expected JSON object in {path}")
     return data
@@ -111,15 +114,18 @@ def load_text(path: Path) -> str:
 
 def build_destination_diagnostics(
     args: argparse.Namespace,
-    config: dict[str, object],
+    config: dict[str, object] | None = None,
+    *,
+    config_error: str | None = None,
 ) -> dict[str, object]:
+    config = config or {}
     config_channel = config.get("channel")
     config_target = config.get("target")
     env_channel = os.environ.get(DEFAULT_CHANNEL_ENV)
     env_target = os.environ.get(DEFAULT_TARGET_ENV)
     env_audio_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
 
-    return {
+    diagnostics: dict[str, object] = {
         "config_path": str(args.config_path),
         "config_exists": args.config_path.exists(),
         "config_has_channel": isinstance(config_channel, str) and bool(config_channel.strip()),
@@ -133,6 +139,9 @@ def build_destination_diagnostics(
         "payload_path": str(args.payload_path),
         "handoff_text_path": str(args.handoff_text_path),
     }
+    if config_error:
+        diagnostics["config_load_error"] = config_error
+    return diagnostics
 
 
 def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> tuple[str, str, str]:
@@ -323,7 +332,11 @@ def main() -> int:
     try:
         payload = load_json(args.payload_path)
         handoff_text = load_text(args.handoff_text_path)
-        config = load_optional_config(args.config_path)
+        try:
+            config = load_optional_config(args.config_path)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            diagnostics = build_destination_diagnostics(args, config_error=str(exc))
+            raise
         diagnostics = build_destination_diagnostics(args, config)
         channel, target, destination_source = resolve_destination(args, config)
         audio_message_mode, audio_message_mode_source = resolve_audio_message_mode(args, config)
