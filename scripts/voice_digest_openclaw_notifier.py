@@ -89,6 +89,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Emit JSON describing the planned action or the OpenClaw result.",
     )
+    parser.add_argument(
+        "--check-setup",
+        action="store_true",
+        help=(
+            "Inspect payload/handoff/config/destination readiness without requiring a preview or send. "
+            "Exits non-zero when the intended notifier environment is still blocked."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -352,6 +360,153 @@ def render_error_json(
     return json.dumps(payload, indent=2) + "\n"
 
 
+def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
+    diagnostics: dict[str, object] | None = None
+    payload_ready = False
+    handoff_ready = False
+    config: dict[str, object] = {}
+    config_error: str | None = None
+    destination_error: str | None = None
+    audio_message_mode_error: str | None = None
+    destination_source: str | None = None
+    channel: str | None = None
+    target: str | None = None
+    requested_audio_message_mode: str | None = None
+    audio_message_mode_source: str | None = None
+
+    try:
+        load_json(args.payload_path)
+        payload_ready = True
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        payload_error = str(exc)
+    else:
+        payload_error = None
+
+    try:
+        load_text(args.handoff_text_path)
+        handoff_ready = True
+    except (OSError, ValueError) as exc:
+        handoff_error = str(exc)
+    else:
+        handoff_error = None
+
+    try:
+        config = load_optional_config(args.config_path)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        config_error = str(exc)
+
+    invalid_audio_message_mode_source = None
+    invalid_audio_message_mode_value = None
+    if config_error is None:
+        try:
+            channel, target, destination_source = resolve_destination(args, config)
+        except ValueError as exc:
+            destination_error = str(exc)
+        try:
+            requested_audio_message_mode, audio_message_mode_source = resolve_audio_message_mode_setting(args, config)
+        except ValueError as exc:
+            audio_message_mode_error = str(exc)
+            error_text = str(exc)
+            if DEFAULT_AUDIO_MESSAGE_MODE_ENV in error_text:
+                invalid_audio_message_mode_source = "env"
+                env_audio_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
+                if isinstance(env_audio_mode, str) and env_audio_mode.strip():
+                    invalid_audio_message_mode_value = env_audio_mode
+            elif "audio_message_mode" in error_text:
+                invalid_audio_message_mode_source = "config"
+                config_audio_mode = config.get("audio_message_mode")
+                if isinstance(config_audio_mode, str) and config_audio_mode.strip():
+                    invalid_audio_message_mode_value = config_audio_mode
+
+    diagnostics = build_destination_diagnostics(
+        args,
+        config,
+        config_error=config_error,
+        invalid_audio_message_mode_source=invalid_audio_message_mode_source,
+        invalid_audio_message_mode_value=invalid_audio_message_mode_value,
+    )
+    openclaw_available = shutil.which("openclaw") is not None
+
+    ready = (
+        payload_ready
+        and handoff_ready
+        and config_error is None
+        and destination_error is None
+        and audio_message_mode_error is None
+        and openclaw_available
+    )
+
+    blockers: list[str] = []
+    if payload_error:
+        blockers.append(payload_error)
+    if handoff_error:
+        blockers.append(handoff_error)
+    if config_error:
+        blockers.append(config_error)
+    if destination_error:
+        blockers.append(destination_error)
+    if audio_message_mode_error:
+        blockers.append(audio_message_mode_error)
+    if not openclaw_available:
+        blockers.append("openclaw CLI is not available in PATH")
+
+    report: dict[str, object] = {
+        "status": "ready" if ready else "blocked",
+        "ready": ready,
+        "payload_ready": payload_ready,
+        "handoff_ready": handoff_ready,
+        "openclaw_available": openclaw_available,
+        "diagnostics": diagnostics,
+        "blockers": blockers,
+    }
+    if payload_error:
+        report["payload_error"] = payload_error
+    if handoff_error:
+        report["handoff_error"] = handoff_error
+    if config_error:
+        report["config_error"] = config_error
+    if destination_error:
+        report["destination_error"] = destination_error
+    if audio_message_mode_error:
+        report["audio_message_mode_error"] = audio_message_mode_error
+    if channel:
+        report["channel"] = channel
+    if target:
+        report["target"] = target
+    if destination_source:
+        report["destination_source"] = destination_source
+    if requested_audio_message_mode:
+        report["requested_audio_message_mode"] = requested_audio_message_mode
+    if audio_message_mode_source:
+        report["audio_message_mode_source"] = audio_message_mode_source
+    return report
+
+
+def render_setup_report_text(report: dict[str, object]) -> str:
+    lines = [
+        f"status: {report['status']}",
+        f"ready: {report['ready']}",
+        f"payload_ready: {report['payload_ready']}",
+        f"handoff_ready: {report['handoff_ready']}",
+        f"openclaw_available: {report['openclaw_available']}",
+    ]
+    if "channel" in report:
+        lines.append(f"channel: {report['channel']}")
+    if "target" in report:
+        lines.append(f"target: {report['target']}")
+    if "destination_source" in report:
+        lines.append(f"destination_source: {report['destination_source']}")
+    if "requested_audio_message_mode" in report:
+        lines.append(f"requested_audio_message_mode: {report['requested_audio_message_mode']}")
+    if "audio_message_mode_source" in report:
+        lines.append(f"audio_message_mode_source: {report['audio_message_mode_source']}")
+    blockers = report.get("blockers")
+    if isinstance(blockers, list):
+        for blocker in blockers:
+            lines.append(f"blocker: {blocker}")
+    return "\n".join(lines) + "\n"
+
+
 def ensure_openclaw_available() -> None:
     if shutil.which("openclaw") is None:
         raise RuntimeError(
@@ -375,6 +530,15 @@ def run_openclaw(plan: dict[str, object], openclaw_dry_run: bool) -> subprocess.
 
 def main() -> int:
     args = parse_args()
+
+    if getattr(args, "check_setup", False):
+        report = build_setup_report(args)
+        if args.json:
+            sys.stdout.write(json.dumps(report, indent=2) + "\n")
+        else:
+            sys.stdout.write(render_setup_report_text(report))
+        return 0 if report["ready"] else 1
+
     diagnostics: dict[str, object] | None = None
 
     try:

@@ -43,6 +43,7 @@ Recommended morning-run shape:
 - if the preferred live message shape is already known, store `audio_message_mode` alongside the destination in that same local config so cron does not need an extra flag
 - use `scripts/voice_digest_dispatch_job.py` as the scheduler entrypoint once the destination is wired, because it writes stable delivery status artifacts for success and failure
 - consider `--max-age-minutes 180` (or a similar window) in scheduler automation so downstream delivery rejects stale `latest_run.json` artifacts instead of reusing yesterday's bundle by accident
+- use `python3 scripts/voice_digest_openclaw_notifier.py --check-setup --json` before the first send-path verification when you want a direct readiness answer about payload/handoff/config/CLI wiring
 - use `--openclaw-dry-run` for the first end-to-end send-path verification before one true live delivery
 - if the full morning handoff is too long for an attached-audio message body, pass `--audio-message-mode caption`, set `VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption`, or write `"audio_message_mode": "caption"` in `.voice_digest_notifier.json`
 

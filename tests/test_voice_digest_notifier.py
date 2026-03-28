@@ -279,6 +279,79 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertEqual(result["diagnostics"]["invalid_audio_message_mode_source"], "config")
             self.assertEqual(result["diagnostics"]["invalid_audio_message_mode_value"], "verbose")
 
+    def test_build_setup_report_marks_destination_gap_as_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode=None,
+            )
+
+            report = module.build_setup_report(args)
+
+            self.assertEqual(report["status"], "blocked")
+            self.assertFalse(report["ready"])
+            self.assertTrue(report["payload_ready"])
+            self.assertTrue(report["handoff_ready"])
+            self.assertIn("destination is not configured", report["destination_error"])
+            self.assertIn(report["destination_error"], report["blockers"])
+
+    def test_main_check_setup_json_reports_ready_environment(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            config_path = tmp / ".voice_digest_notifier.json"
+            payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+            config_path.write_text(
+                json.dumps({
+                    "channel": "signal",
+                    "target": "+37060000000",
+                    "audio_message_mode": "auto",
+                }),
+                encoding="utf-8",
+            )
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel=None,
+                target=None,
+                config_path=config_path,
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+                json=True,
+                check_setup=True,
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module.shutil,
+                "which",
+                return_value="/usr/bin/openclaw",
+            ), mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["status"], "ready")
+            self.assertTrue(result["ready"])
+            self.assertEqual(result["destination_source"], "config")
+            self.assertEqual(result["requested_audio_message_mode"], "auto")
+            self.assertEqual(result["audio_message_mode_source"], "config")
+            self.assertEqual(result["diagnostics"]["config_exists"], True)
+            self.assertEqual(result["blockers"], [])
+
     def test_main_preview_json_preserves_auto_resolution_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)

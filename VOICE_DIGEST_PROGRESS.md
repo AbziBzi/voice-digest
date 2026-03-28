@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Added an explicit notifier readiness probe: `scripts/voice_digest_openclaw_notifier.py --check-setup` now reports whether payload/handoff artifacts exist, destination wiring resolves, audio-message-mode config is valid, and the `openclaw` CLI is available, without needing to infer readiness from a failed preview/send attempt.
+- Added regression coverage in `tests/test_voice_digest_notifier.py` for both the blocked missing-destination case and a fully ready config-backed environment, and verified with `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py tests/test_voice_digest_notifier.py` plus `python3 -m unittest tests.test_voice_digest_notifier`.
+- Live repo check: `python3 scripts/voice_digest_openclaw_notifier.py --check-setup --json` currently reports `status: blocked` only because the real destination is still unwired here; payload/handoff artifacts and the local `openclaw` CLI are already present.
+- Learned: the remaining delivery-path ambiguity is now narrow enough that it should be checked directly before the first intended-config dry run, instead of relying on a failed notifier invocation to explain what is missing.
+- Next step: add Edwin's real destination via env or local config, rerun `--check-setup` until it goes ready, then do the intended-config `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` before one true live delivery.
+
+### 2026-03-28
 - Verified the intended non-`--dry-run` scheduler path end-to-end without risking a real send: a temp `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run --audio-message-mode auto` run against a fresh sample input produced a real MP3 via the OpenAI fallback path after an ElevenLabs 401, wrote live-mode handoff/payload/status artifacts, and reached the OpenClaw send boundary successfully in dry-run mode.
 - Learned: the repo-level blocker has narrowed again — the dispatch flow itself can now prove real audio generation plus notifier execution, so the remaining unknown is the intended live environment wiring (real input path + real destination), not whether the scheduler-facing path can synthesize audio.
 - Next step: repeat that same `--send --openclaw-dry-run` verification in Edwin's intended scheduler environment with the real input directory/destination wiring, then do one true live delivery.
