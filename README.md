@@ -250,6 +250,16 @@ python3 scripts/voice_digest_dispatch_job.py \
   --openclaw-dry-run
 ```
 
+If you want the top-level scheduler entrypoint to stop after an environment/readiness check, use:
+
+```bash
+python3 scripts/voice_digest_dispatch_job.py \
+  --input-dir incoming_digests \
+  --check-setup
+```
+
+That run still builds the current morning artifacts, then calls the notifier's readiness probe and writes stable `out/delivery_status.json` / `out/delivery_status.txt` outputs that say whether the remaining blocker is upstream input generation, destination wiring, config validity, or `openclaw` availability.
+
 If cron should point at a different upstream drop path without carrying another CLI flag, set:
 
 ```bash

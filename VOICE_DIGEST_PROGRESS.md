@@ -11,6 +11,14 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Surfaced notifier readiness through the top-level scheduler entrypoint: `scripts/voice_digest_dispatch_job.py --check-setup` now regenerates the morning artifacts, runs the notifier's existing readiness probe, and still writes stable `delivery_status.json` / `delivery_status.txt` outputs so overnight or cron-style preflight runs leave one place to inspect the current blocker.
+- Taught the dispatch status contract about this new blocked-vs-ready preflight state, including setup blocker lines plus targeted next-step guidance when the remaining issue is missing input, missing destination wiring, invalid audio-mode config, or missing `openclaw`.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for both command construction and the blocked status-artifact shape.
+- Verification passed in two layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, and `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (13 tests). A live repo check with a temp digest input and no destination wiring also produced `out/delivery_status.txt` with `status: blocked`, `stage: notifier_check_setup`, the preserved setup blocker, and the expected next action.
+- Learned: the notifier already knew how to answer “what exactly is still unwired?”, but surfacing that answer through the scheduler-facing entrypoint is what makes overnight workers and cron handoffs materially less ambiguous.
+- Next step: run `scripts/voice_digest_dispatch_job.py --input-dir <real-upstream-path> --check-setup` in Edwin's intended environment until it goes ready, then do the intended-config `--send --openclaw-dry-run` before one true live delivery.
+
+### 2026-03-28
 - Added an explicit notifier readiness probe: `scripts/voice_digest_openclaw_notifier.py --check-setup` now reports whether payload/handoff artifacts exist, destination wiring resolves, audio-message-mode config is valid, and the `openclaw` CLI is available, without needing to infer readiness from a failed preview/send attempt.
 - Added regression coverage in `tests/test_voice_digest_notifier.py` for both the blocked missing-destination case and a fully ready config-backed environment, and verified with `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py tests/test_voice_digest_notifier.py` plus `python3 -m unittest tests.test_voice_digest_notifier`.
 - Live repo check: `python3 scripts/voice_digest_openclaw_notifier.py --check-setup --json` currently reports `status: blocked` only because the real destination is still unwired here; payload/handoff artifacts and the local `openclaw` CLI are already present.

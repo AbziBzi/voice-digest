@@ -143,6 +143,14 @@ def parse_args() -> argparse.Namespace:
         help="Message-body mode passed through to the notifier for live audio sends.",
     )
     parser.add_argument(
+        "--check-setup",
+        action="store_true",
+        help=(
+            "Run the notifier's readiness probe after building morning artifacts so the dispatch job can leave "
+            "stable delivery-status files for the intended environment without previewing or sending a message."
+        ),
+    )
+    parser.add_argument(
         "--send",
         action="store_true",
         help="Actually invoke `openclaw message send`. Without this flag the notifier runs in preview mode.",
@@ -250,10 +258,12 @@ def build_notifier_command(args: argparse.Namespace) -> list[str]:
         command.extend(["--target", args.target])
     if args.audio_message_mode:
         command.extend(["--audio-message-mode", args.audio_message_mode])
-    if args.send:
+    if args.check_setup:
+        command.append("--check-setup")
+    elif args.send:
         command.append("--send")
-    if args.openclaw_dry_run:
-        command.append("--openclaw-dry-run")
+        if args.openclaw_dry_run:
+            command.append("--openclaw-dry-run")
     return command
 
 
@@ -327,14 +337,43 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
     detail = error.get("detail")
     detail_text = detail.lower() if isinstance(detail, str) else ""
 
+    if status.get("status") == "blocked":
+        if error.get("stage") == "notifier_check_setup":
+            if diagnostics.get("config_load_error"):
+                return "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun --check-setup."
+            invalid_audio_mode_source = diagnostics.get("invalid_audio_message_mode_source")
+            if invalid_audio_mode_source == "env":
+                return "Fix VOICE_DIGEST_AUDIO_MESSAGE_MODE so it is one of full, caption, or auto, then rerun --check-setup."
+            if invalid_audio_mode_source == "config":
+                return "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun --check-setup."
+            if "openclaw cli" in detail_text or '"openclaw_available": false' in detail_text:
+                return "Ensure the openclaw CLI is installed and available on PATH for the intended scheduler environment, then rerun --check-setup."
+            missing_destination = not any(
+                [
+                    diagnostics.get("config_has_channel") and diagnostics.get("config_has_target"),
+                    diagnostics.get("env_channel_set") and diagnostics.get("env_target_set"),
+                    diagnostics.get("cli_channel_set") and diagnostics.get("cli_target_set"),
+                ]
+            )
+            if missing_destination:
+                return (
+                    "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / "
+                    "VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun --check-setup."
+                )
+            return "Inspect the notifier readiness blockers in delivery_status.json, fix the environment, then rerun --check-setup."
+
+        return "Inspect the captured blockers in delivery_status.json and rerun only after the intended environment is ready."
+
     if status.get("status") == "failed":
         if error.get("stage") == "morning_job":
             if "no digest files matched" in detail_text or "input directory" in detail_text:
+                rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
                 return (
                     f"Populate {input_dir_display} with a fresh digest text file or point the dispatch job at the real "
-                    "upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun the dispatch job."
+                    f"upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun {rerun_target}."
                 )
-            return "Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun the dispatch job."
+            rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
+            return f"Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun {rerun_target}."
 
         missing_destination = not any(
             [
@@ -379,6 +418,9 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
         return "Inspect the captured error detail in delivery_status.json and rerun only after the blocked stage is fixed."
 
     if status.get("status") == "succeeded":
+        if dispatch.get("check_setup"):
+            return "Notifier setup is ready in this environment; the next milestone is an intended-config --send --openclaw-dry-run dispatch before one true live delivery."
+
         if notifier_action == "send_text_fallback" and delivery_kind == "dry-run-note":
             if dispatch.get("tts_dry_run"):
                 return (
@@ -474,6 +516,10 @@ def render_status_text(status: dict[str, Any]) -> str:
         resolved_mode_reason = dispatch.get("audio_message_mode_reason")
         message_text_length = dispatch.get("message_text_length")
         max_message_text_length = dispatch.get("max_audio_message_text_length")
+        payload_ready = dispatch.get("payload_ready")
+        handoff_ready = dispatch.get("handoff_ready")
+        openclaw_available = dispatch.get("openclaw_available")
+        setup_blockers = dispatch.get("setup_blockers")
         if input_dir:
             lines.append(f"input_dir: {input_dir}")
         if input_dir_source:
@@ -492,6 +538,15 @@ def render_status_text(status: dict[str, Any]) -> str:
             lines.append(f"message_text_length: {message_text_length}")
         if max_message_text_length is not None:
             lines.append(f"max_audio_message_text_length: {max_message_text_length}")
+        if payload_ready is not None:
+            lines.append(f"payload_ready: {payload_ready}")
+        if handoff_ready is not None:
+            lines.append(f"handoff_ready: {handoff_ready}")
+        if openclaw_available is not None:
+            lines.append(f"openclaw_available: {openclaw_available}")
+        if isinstance(setup_blockers, list):
+            for blocker in setup_blockers:
+                lines.append(f"setup_blocker: {blocker}")
 
     error = status.get("error")
     if isinstance(error, dict):
@@ -584,6 +639,7 @@ def build_base_status(
             "status_text_path": str(args.status_text_path),
         },
         "dispatch": {
+            "check_setup": args.check_setup,
             "send": args.send,
             "openclaw_dry_run": args.openclaw_dry_run,
             "tts_dry_run": args.dry_run,
@@ -652,7 +708,10 @@ def main() -> int:
         return 1
 
     notifier_command = build_notifier_command(args)
-    notifier_stage = "notifier_send" if args.send else "notifier_preview"
+    if args.check_setup:
+        notifier_stage = "notifier_check_setup"
+    else:
+        notifier_stage = "notifier_send" if args.send else "notifier_preview"
     status["stage"] = notifier_stage
     status["commands"]["notifier"] = command_preview(notifier_command)
     notifier_result = run_command(notifier_command)
@@ -703,7 +762,7 @@ def main() -> int:
         diagnostics = notifier_json.get("diagnostics")
         if isinstance(diagnostics, dict):
             status["diagnostics"] = diagnostics
-        plan = notifier_json.get("plan") if args.send else notifier_json
+        plan = notifier_json.get("plan") if args.send and not args.check_setup else notifier_json
         if isinstance(plan, dict):
             status["destination"] = {
                 "channel": plan.get("channel"),
@@ -716,9 +775,16 @@ def main() -> int:
             status["dispatch"]["audio_message_mode_reason"] = plan.get("audio_message_mode_reason")
             status["dispatch"]["message_text_length"] = plan.get("message_text_length")
             status["dispatch"]["max_audio_message_text_length"] = plan.get("max_audio_message_text_length")
+            if args.check_setup:
+                status["dispatch"]["payload_ready"] = plan.get("payload_ready")
+                status["dispatch"]["handoff_ready"] = plan.get("handoff_ready")
+                status["dispatch"]["openclaw_available"] = plan.get("openclaw_available")
+                blockers = plan.get("blockers")
+                if isinstance(blockers, list):
+                    status["dispatch"]["setup_blockers"] = blockers
 
     if notifier_result.returncode != 0:
-        status["status"] = "failed"
+        status["status"] = "blocked" if args.check_setup else "failed"
         status["error"] = summarize_command_failure(
             notifier_result,
             notifier_stage,

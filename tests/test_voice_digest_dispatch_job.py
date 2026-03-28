@@ -19,6 +19,25 @@ spec.loader.exec_module(module)
 
 
 class VoiceDigestDispatchJobTests(unittest.TestCase):
+    def test_build_notifier_command_uses_check_setup_instead_of_send(self) -> None:
+        args = Namespace(
+            payload_json_path=Path("/tmp/delivery_payload.json"),
+            handoff_text_path=Path("/tmp/morning_handoff.txt"),
+            config_path=Path("/tmp/.voice_digest_notifier.json"),
+            channel="signal",
+            target="+37060000000",
+            audio_message_mode="auto",
+            check_setup=True,
+            send=True,
+            openclaw_dry_run=True,
+        )
+
+        command = module.build_notifier_command(args)
+
+        self.assertIn("--check-setup", command)
+        self.assertNotIn("--send", command)
+        self.assertNotIn("--openclaw-dry-run", command)
+
     def test_resolve_input_dir_prefers_cli_then_env_then_default(self) -> None:
         cli_args = Namespace(input_dir=Path("/tmp/cli-digests"))
         self.assertEqual(
@@ -80,6 +99,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 target=None,
                 config_path=tmp / ".voice_digest_notifier.json",
                 audio_message_mode="auto",
+                check_setup=False,
                 send=True,
                 openclaw_dry_run=True,
             )
@@ -207,6 +227,130 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("message_text_length: 122", status_text)
             self.assertIn("max_audio_message_text_length: 1200", status_text)
             self.assertIn("next_action: Inspect the notifier send error detail", status_text)
+
+    def test_main_check_setup_writes_blocked_status_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            args = Namespace(
+                input_dir=None,
+                glob="*.txt",
+                runs_dir=tmp / "out" / "runs",
+                state_path=tmp / "out" / "latest_run.json",
+                handoff_text_path=tmp / "out" / "morning_handoff.txt",
+                handoff_json_path=tmp / "out" / "morning_handoff.json",
+                payload_json_path=tmp / "out" / "delivery_payload.json",
+                status_json_path=tmp / "out" / "delivery_status.json",
+                status_text_path=tmp / "out" / "delivery_status.txt",
+                run_id=None,
+                intro=None,
+                outro=None,
+                voice_id=None,
+                model_id=None,
+                dry_run=False,
+                max_age_minutes=180.0,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode="auto",
+                check_setup=True,
+                send=True,
+                openclaw_dry_run=True,
+            )
+
+            morning_result = CompletedProcess(
+                args=["python3", "morning"],
+                returncode=0,
+                stdout="morning ok\n",
+                stderr="",
+            )
+            notifier_payload = {
+                "status": "blocked",
+                "ready": False,
+                "payload_ready": True,
+                "handoff_ready": True,
+                "openclaw_available": True,
+                "blockers": ["destination is not configured"],
+                "diagnostics": {
+                    "config_path": str(tmp / ".voice_digest_notifier.json"),
+                    "config_exists": False,
+                    "config_has_channel": False,
+                    "config_has_target": False,
+                    "config_has_audio_message_mode": False,
+                    "env_channel_set": False,
+                    "env_target_set": False,
+                    "env_audio_message_mode_set": False,
+                    "cli_channel_set": False,
+                    "cli_target_set": False,
+                    "cli_audio_message_mode_set": True,
+                    "payload_path": str(tmp / "out" / "delivery_payload.json"),
+                    "handoff_text_path": str(tmp / "out" / "morning_handoff.txt"),
+                },
+                "requested_audio_message_mode": "auto",
+                "audio_message_mode_source": "cli",
+            }
+            notifier_result = CompletedProcess(
+                args=["python3", "notifier"],
+                returncode=1,
+                stdout=json.dumps(notifier_payload),
+                stderr="",
+            )
+            payload_json = {
+                "mode": "live",
+                "notifier_action": "send_audio",
+                "delivery_kind": "audio",
+                "delivery_target": str(tmp / "out" / "runs" / "digest.mp3"),
+                "run": {
+                    "selected_input": str(tmp / "incoming_digests" / "digest.txt"),
+                    "age_minutes": 5.0,
+                },
+                "summary": {
+                    "selected_input_details": {
+                        "path": str(tmp / "incoming_digests" / "digest.txt"),
+                        "exists": True,
+                        "size_bytes": 123,
+                        "modified_at": "2026-03-28T18:00:00+00:00",
+                        "age_minutes": 4.0,
+                    },
+                    "delivery_target_details": {
+                        "path": str(tmp / "out" / "runs" / "digest.mp3"),
+                        "exists": True,
+                        "size_bytes": 456,
+                        "modified_at": "2026-03-28T18:01:00+00:00",
+                        "age_minutes": 3.0,
+                    },
+                },
+            }
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module,
+                "run_command",
+                side_effect=[morning_result, notifier_result],
+            ), mock.patch.object(module, "load_optional_json", return_value=payload_json), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ), mock.patch("sys.stderr", new_callable=io.StringIO):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            status = json.loads(args.status_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["status"], "blocked")
+            self.assertEqual(status["error"]["stage"], "notifier_check_setup")
+            self.assertEqual(status["dispatch"]["check_setup"], True)
+            self.assertEqual(status["dispatch"]["payload_ready"], True)
+            self.assertEqual(status["dispatch"]["handoff_ready"], True)
+            self.assertEqual(status["dispatch"]["openclaw_available"], True)
+            self.assertEqual(status["dispatch"]["setup_blockers"], ["destination is not configured"])
+            self.assertEqual(
+                status["next_action"],
+                "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun --check-setup.",
+            )
+
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("status: blocked", status_text)
+            self.assertIn("payload_ready: True", status_text)
+            self.assertIn("handoff_ready: True", status_text)
+            self.assertIn("openclaw_available: True", status_text)
+            self.assertIn("setup_blocker: destination is not configured", status_text)
+            self.assertIn("next_action: Provision the real OpenClaw destination", status_text)
 
     def test_derive_next_action_flags_missing_destination_wiring(self) -> None:
         send_status = {
@@ -367,6 +511,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 target=None,
                 config_path=tmp / ".voice_digest_notifier.json",
                 audio_message_mode=None,
+                check_setup=False,
                 send=False,
                 openclaw_dry_run=False,
             )
@@ -454,6 +599,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 target=None,
                 config_path=tmp / ".voice_digest_notifier.json",
                 audio_message_mode=None,
+                check_setup=False,
                 send=False,
                 openclaw_dry_run=False,
             )
