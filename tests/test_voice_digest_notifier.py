@@ -230,6 +230,55 @@ class VoiceDigestNotifierTests(unittest.TestCase):
         self.assertLess(plan["message_text_length"], len(long_handoff))
         self.assertEqual(plan["max_audio_message_text_length"], module.MAX_AUDIO_MESSAGE_TEXT_LENGTH)
 
+    def test_resolve_audio_message_mode_setting_rejects_invalid_env_value(self) -> None:
+        args = Namespace(audio_message_mode=None, config_path=Path("/tmp/.voice_digest_notifier.json"))
+        with mock.patch.dict(module.os.environ, {module.DEFAULT_AUDIO_MESSAGE_MODE_ENV: "long"}, clear=False):
+            with self.assertRaisesRegex(ValueError, "VOICE_DIGEST_AUDIO_MESSAGE_MODE"):
+                module.resolve_audio_message_mode_setting(args, {})
+
+    def test_main_emits_diagnostics_for_invalid_config_audio_message_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            config_path = tmp / ".voice_digest_notifier.json"
+            payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+            config_path.write_text(
+                json.dumps({
+                    "channel": "signal",
+                    "target": "+37060000000",
+                    "audio_message_mode": "verbose",
+                }),
+                encoding="utf-8",
+            )
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel=None,
+                target=None,
+                config_path=config_path,
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+                json=True,
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ) as stdout:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["status"], "error")
+            self.assertIn("invalid audio_message_mode", result["error"])
+            self.assertEqual(result["diagnostics"]["config_has_audio_message_mode"], True)
+            self.assertEqual(result["diagnostics"]["config_audio_message_mode"], "verbose")
+            self.assertEqual(result["diagnostics"]["invalid_audio_message_mode_source"], "config")
+            self.assertEqual(result["diagnostics"]["invalid_audio_message_mode_value"], "verbose")
+
     def test_main_preview_json_preserves_auto_resolution_details(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)

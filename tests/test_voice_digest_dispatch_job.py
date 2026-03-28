@@ -298,6 +298,138 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun the preview or send path.",
         )
 
+    def test_derive_next_action_flags_invalid_audio_message_mode_source(self) -> None:
+        send_env_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_send",
+                "detail": "invalid VOICE_DIGEST_AUDIO_MESSAGE_MODE value: 'long'; expected one of full, caption, auto",
+            },
+            "diagnostics": {
+                "invalid_audio_message_mode_source": "env",
+                "invalid_audio_message_mode_value": "long",
+                "config_has_channel": True,
+                "config_has_target": True,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+        self.assertEqual(
+            module.derive_next_action(send_env_status),
+            "Fix VOICE_DIGEST_AUDIO_MESSAGE_MODE so it is one of full, caption, or auto, then rerun with --send --openclaw-dry-run.",
+        )
+
+        preview_config_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_preview",
+                "detail": "invalid audio_message_mode in .voice_digest_notifier.json: 'verbose'; expected one of full, caption, auto",
+            },
+            "diagnostics": {
+                "invalid_audio_message_mode_source": "config",
+                "invalid_audio_message_mode_value": "verbose",
+                "config_has_channel": True,
+                "config_has_target": True,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+        self.assertEqual(
+            module.derive_next_action(preview_config_status),
+            "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun the preview or send path.",
+        )
+
+    def test_main_preserves_invalid_audio_message_mode_diagnostics_in_status_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            args = Namespace(
+                input_dir=None,
+                glob="*.txt",
+                runs_dir=tmp / "out" / "runs",
+                state_path=tmp / "out" / "latest_run.json",
+                handoff_text_path=tmp / "out" / "morning_handoff.txt",
+                handoff_json_path=tmp / "out" / "morning_handoff.json",
+                payload_json_path=tmp / "out" / "delivery_payload.json",
+                status_json_path=tmp / "out" / "delivery_status.json",
+                status_text_path=tmp / "out" / "delivery_status.txt",
+                run_id=None,
+                intro=None,
+                outro=None,
+                voice_id=None,
+                model_id=None,
+                dry_run=False,
+                max_age_minutes=None,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode=None,
+                send=False,
+                openclaw_dry_run=False,
+            )
+
+            morning_result = CompletedProcess(
+                args=["python3", "morning"],
+                returncode=0,
+                stdout="morning ok\n",
+                stderr="",
+            )
+            notifier_payload = {
+                "status": "error",
+                "error": f"invalid audio_message_mode in {tmp / '.voice_digest_notifier.json'}: 'verbose'; expected one of full, caption, auto",
+                "diagnostics": {
+                    "config_path": str(tmp / ".voice_digest_notifier.json"),
+                    "config_exists": True,
+                    "config_has_channel": True,
+                    "config_has_target": True,
+                    "config_has_audio_message_mode": True,
+                    "config_audio_message_mode": "verbose",
+                    "env_channel_set": False,
+                    "env_target_set": False,
+                    "env_audio_message_mode_set": False,
+                    "cli_channel_set": False,
+                    "cli_target_set": False,
+                    "cli_audio_message_mode_set": False,
+                    "invalid_audio_message_mode_source": "config",
+                    "invalid_audio_message_mode_value": "verbose",
+                    "payload_path": str(tmp / "out" / "delivery_payload.json"),
+                    "handoff_text_path": str(tmp / "out" / "morning_handoff.txt"),
+                },
+            }
+            notifier_result = CompletedProcess(
+                args=["python3", "notifier"],
+                returncode=1,
+                stdout=json.dumps(notifier_payload),
+                stderr="",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module,
+                "run_command",
+                side_effect=[morning_result, notifier_result],
+            ), mock.patch.object(module, "load_optional_json", return_value=None), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ), mock.patch("sys.stderr", new_callable=io.StringIO):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            status = json.loads(args.status_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["diagnostics"]["invalid_audio_message_mode_source"], "config")
+            self.assertEqual(status["diagnostics"]["invalid_audio_message_mode_value"], "verbose")
+            self.assertEqual(status["diagnostics"]["config_audio_message_mode"], "verbose")
+            self.assertEqual(
+                status["next_action"],
+                "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun the preview or send path.",
+            )
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("config_audio_message_mode: verbose", status_text)
+            self.assertIn("invalid_audio_message_mode_source: config", status_text)
+            self.assertIn("invalid_audio_message_mode_value: verbose", status_text)
+            self.assertIn("next_action: Fix audio_message_mode in .voice_digest_notifier.json", status_text)
+
     def test_main_preserves_config_load_error_in_status_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)

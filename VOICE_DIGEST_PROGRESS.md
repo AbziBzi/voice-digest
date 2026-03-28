@@ -11,6 +11,14 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Hardened notifier message-mode wiring: `scripts/voice_digest_openclaw_notifier.py` now rejects invalid `VOICE_DIGEST_AUDIO_MESSAGE_MODE` / `.voice_digest_notifier.json` values instead of silently defaulting to `full`, and its diagnostics preserve the invalid source/value plus configured mode fields for faster scheduler triage.
+- Taught `scripts/voice_digest_dispatch_job.py` to carry those invalid-mode diagnostics into `delivery_status.json` / `delivery_status.txt` and emit specific next-step guidance for bad env/config message-mode wiring instead of a generic notifier failure.
+- Added regression coverage in `tests/test_voice_digest_notifier.py` and `tests/test_voice_digest_dispatch_job.py` for invalid env/config mode handling, status-artifact preservation, and the new targeted next-action guidance.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py scripts/voice_digest_dispatch_job.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed (19 tests), and the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (25 tests).
+- Learned: silently downgrading an invalid scheduler-configured message mode to `full` is the kind of tiny operational bug that only shows up on the first real morning send; failing loudly with preserved diagnostics is safer than guessing.
+- Next step: once the real destination/input wiring is in place, run one intended-config `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` without `--dry-run` so the scheduler path proves a real audio artifact under the now-stricter notifier config contract.
+
+### 2026-03-28
 - Added an `auto` live-audio message-body mode to the OpenClaw notifier/dispatch path, so morning sends can keep the full handoff when it is concise but automatically fall back to the shorter caption when the handoff grows past a safe message-length budget.
 - The notifier preview/send plan now records both the requested mode and the resolved live mode plus the reason, message length, and configured limit; `delivery_status.json` / `delivery_status.txt` preserve those fields for scheduler-visible morning triage.
 - Updated regression coverage in `tests/test_voice_digest_notifier.py` and `tests/test_voice_digest_dispatch_job.py` for auto-mode resolution and status-artifact preservation.

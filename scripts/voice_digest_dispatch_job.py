@@ -347,6 +347,11 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
         if error.get("stage") == "notifier_send":
             if diagnostics.get("config_load_error"):
                 return "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun with --send --openclaw-dry-run."
+            invalid_audio_mode_source = diagnostics.get("invalid_audio_message_mode_source")
+            if invalid_audio_mode_source == "env":
+                return "Fix VOICE_DIGEST_AUDIO_MESSAGE_MODE so it is one of full, caption, or auto, then rerun with --send --openclaw-dry-run."
+            if invalid_audio_mode_source == "config":
+                return "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun with --send --openclaw-dry-run."
             if "openclaw cli is not available" in detail_text or "openclaw cli could not be executed" in detail_text:
                 return "Ensure the openclaw CLI is installed and available on PATH for the scheduler environment, then rerun with --send --openclaw-dry-run."
             if missing_destination:
@@ -359,6 +364,11 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
         if error.get("stage") == "notifier_preview":
             if diagnostics.get("config_load_error"):
                 return "Fix the malformed .voice_digest_notifier.json (or point --config-path at a valid JSON file), then rerun the preview or send path."
+            invalid_audio_mode_source = diagnostics.get("invalid_audio_message_mode_source")
+            if invalid_audio_mode_source == "env":
+                return "Fix VOICE_DIGEST_AUDIO_MESSAGE_MODE so it is one of full, caption, or auto, then rerun the preview or send path."
+            if invalid_audio_mode_source == "config":
+                return "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun the preview or send path."
             if missing_destination:
                 return (
                     "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / "
@@ -506,10 +516,15 @@ def render_status_text(status: dict[str, Any]) -> str:
             "config_exists",
             "config_has_channel",
             "config_has_target",
+            "config_has_audio_message_mode",
+            "config_audio_message_mode",
             "config_load_error",
             "env_channel_set",
             "env_target_set",
             "env_audio_message_mode_set",
+            "env_audio_message_mode",
+            "invalid_audio_message_mode_source",
+            "invalid_audio_message_mode_value",
             "cli_channel_set",
             "cli_target_set",
             "cli_audio_message_mode_set",

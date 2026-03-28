@@ -120,10 +120,13 @@ def build_destination_diagnostics(
     config: dict[str, object] | None = None,
     *,
     config_error: str | None = None,
+    invalid_audio_message_mode_source: str | None = None,
+    invalid_audio_message_mode_value: str | None = None,
 ) -> dict[str, object]:
     config = config or {}
     config_channel = config.get("channel")
     config_target = config.get("target")
+    config_audio_mode = config.get("audio_message_mode")
     env_channel = os.environ.get(DEFAULT_CHANNEL_ENV)
     env_target = os.environ.get(DEFAULT_TARGET_ENV)
     env_audio_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
@@ -133,6 +136,7 @@ def build_destination_diagnostics(
         "config_exists": args.config_path.exists(),
         "config_has_channel": isinstance(config_channel, str) and bool(config_channel.strip()),
         "config_has_target": isinstance(config_target, str) and bool(config_target.strip()),
+        "config_has_audio_message_mode": isinstance(config_audio_mode, str) and bool(config_audio_mode.strip()),
         "env_channel_set": bool(env_channel),
         "env_target_set": bool(env_target),
         "env_audio_message_mode_set": bool(env_audio_mode),
@@ -142,8 +146,16 @@ def build_destination_diagnostics(
         "payload_path": str(args.payload_path),
         "handoff_text_path": str(args.handoff_text_path),
     }
+    if isinstance(config_audio_mode, str) and config_audio_mode.strip():
+        diagnostics["config_audio_message_mode"] = config_audio_mode
+    if isinstance(env_audio_mode, str) and env_audio_mode.strip():
+        diagnostics["env_audio_message_mode"] = env_audio_mode
     if config_error:
         diagnostics["config_load_error"] = config_error
+    if invalid_audio_message_mode_source:
+        diagnostics["invalid_audio_message_mode_source"] = invalid_audio_message_mode_source
+    if invalid_audio_message_mode_value:
+        diagnostics["invalid_audio_message_mode_value"] = invalid_audio_message_mode_value
     return diagnostics
 
 
@@ -181,13 +193,22 @@ def resolve_audio_message_mode_setting(
 ) -> tuple[str, str]:
     config_mode = config.get("audio_message_mode")
     env_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
+    valid_modes = {"full", "caption", "auto"}
 
     if args.audio_message_mode:
         return args.audio_message_mode, "cli"
-    if isinstance(env_mode, str) and env_mode in {"full", "caption", "auto"}:
-        return env_mode, "env"
-    if isinstance(config_mode, str) and config_mode in {"full", "caption", "auto"}:
-        return config_mode, "config"
+    if isinstance(env_mode, str) and env_mode.strip():
+        if env_mode in valid_modes:
+            return env_mode, "env"
+        raise ValueError(
+            f"invalid {DEFAULT_AUDIO_MESSAGE_MODE_ENV} value: {env_mode!r}; expected one of full, caption, auto"
+        )
+    if isinstance(config_mode, str) and config_mode.strip():
+        if config_mode in valid_modes:
+            return config_mode, "config"
+        raise ValueError(
+            f"invalid audio_message_mode in {args.config_path}: {config_mode!r}; expected one of full, caption, auto"
+        )
     return "full", "default"
 
 
@@ -366,7 +387,29 @@ def main() -> int:
             raise
         diagnostics = build_destination_diagnostics(args, config)
         channel, target, destination_source = resolve_destination(args, config)
-        requested_audio_message_mode, audio_message_mode_source = resolve_audio_message_mode_setting(args, config)
+        try:
+            requested_audio_message_mode, audio_message_mode_source = resolve_audio_message_mode_setting(args, config)
+        except ValueError as exc:
+            invalid_source = None
+            invalid_value = None
+            error_text = str(exc)
+            if DEFAULT_AUDIO_MESSAGE_MODE_ENV in error_text:
+                invalid_source = "env"
+                env_audio_mode = os.environ.get(DEFAULT_AUDIO_MESSAGE_MODE_ENV)
+                if isinstance(env_audio_mode, str) and env_audio_mode.strip():
+                    invalid_value = env_audio_mode
+            elif "audio_message_mode" in error_text:
+                invalid_source = "config"
+                config_audio_mode = config.get("audio_message_mode")
+                if isinstance(config_audio_mode, str) and config_audio_mode.strip():
+                    invalid_value = config_audio_mode
+            diagnostics = build_destination_diagnostics(
+                args,
+                config,
+                invalid_audio_message_mode_source=invalid_source,
+                invalid_audio_message_mode_value=invalid_value,
+            )
+            raise
         plan = build_message_plan(
             payload,
             handoff_text,
