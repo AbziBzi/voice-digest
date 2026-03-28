@@ -10,6 +10,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 
 ## Entries
 
+### 2026-03-29
+- Added a checked-in `.voice_digest_notifier.example.json` and documented the concrete first-live path in `README.md` / `WORKFLOW.md`, so local notifier wiring no longer depends on reverse-engineering the expected config shape from scattered prose before the intended-config dry run.
+- The docs now include an explicit five-step readiness sequence: populate `incoming_digests/` (or set `VOICE_DIGEST_INPUT_DIR`), copy the example config into `.voice_digest_notifier.json`, run `--check-setup` until ready, run `--send --openclaw-dry-run`, then do the first live `--send`.
+- Verification passed in two layers: `python3 -m json.tool .voice_digest_notifier.example.json` succeeded, and a doc sanity pass confirmed the sample-config path plus first-live checklist are now present in both `README.md` and `WORKFLOW.md`.
+- Learned: the remaining blocker is real environment wiring, not script behavior, so repo clarity matters if we want the final handoff to be executable instead of just technically possible.
+- Next step: use the sample config in Edwin's intended environment, get `scripts/voice_digest_dispatch_job.py --check-setup` to `ready`, then do the intended-config `--send --openclaw-dry-run` before one true live delivery.
+
 ### 2026-03-28
 - Tightened the morning-handoff summary line so `scripts/voice_digest_morning_handoff.py` now prefers the actual milestone/change bullet from the latest progress entry instead of surfacing trailing `Learned:` or `Next step:` bullets when both are present.
 - Added `tests/test_voice_digest_morning_handoff.py` to lock in that progress-line selection behavior, including the fallback case when an entry only has verification/learned-style bullets.

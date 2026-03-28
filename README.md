@@ -260,6 +260,14 @@ python3 scripts/voice_digest_dispatch_job.py \
 
 That run still builds the current morning artifacts, then calls the notifier's readiness probe and writes stable `out/delivery_status.json` / `out/delivery_status.txt` outputs that say whether the remaining blocker is upstream input generation, destination wiring, config validity, or `openclaw` availability.
 
+Recommended first-live checklist:
+
+1. Put a fresh digest text file in `incoming_digests/` or set `VOICE_DIGEST_INPUT_DIR` to the real upstream drop.
+2. Copy `.voice_digest_notifier.example.json` to `.voice_digest_notifier.json` and replace the sample target with the real Signal/OpenClaw destination.
+3. Run `python3 scripts/voice_digest_dispatch_job.py --check-setup` until `out/delivery_status.txt` reports a ready notifier environment.
+4. Run `python3 scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` to verify the true send path without delivering.
+5. Run `python3 scripts/voice_digest_dispatch_job.py --send` for the first real morning delivery.
+
 If cron should point at a different upstream drop path without carrying another CLI flag, set:
 
 ```bash
