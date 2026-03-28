@@ -11,6 +11,11 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Verified the intended non-`--dry-run` scheduler path end-to-end without risking a real send: a temp `scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run --audio-message-mode auto` run against a fresh sample input produced a real MP3 via the OpenAI fallback path after an ElevenLabs 401, wrote live-mode handoff/payload/status artifacts, and reached the OpenClaw send boundary successfully in dry-run mode.
+- Learned: the repo-level blocker has narrowed again — the dispatch flow itself can now prove real audio generation plus notifier execution, so the remaining unknown is the intended live environment wiring (real input path + real destination), not whether the scheduler-facing path can synthesize audio.
+- Next step: repeat that same `--send --openclaw-dry-run` verification in Edwin's intended scheduler environment with the real input directory/destination wiring, then do one true live delivery.
+
+### 2026-03-28
 - Hardened notifier message-mode wiring: `scripts/voice_digest_openclaw_notifier.py` now rejects invalid `VOICE_DIGEST_AUDIO_MESSAGE_MODE` / `.voice_digest_notifier.json` values instead of silently defaulting to `full`, and its diagnostics preserve the invalid source/value plus configured mode fields for faster scheduler triage.
 - Taught `scripts/voice_digest_dispatch_job.py` to carry those invalid-mode diagnostics into `delivery_status.json` / `delivery_status.txt` and emit specific next-step guidance for bad env/config message-mode wiring instead of a generic notifier failure.
 - Added regression coverage in `tests/test_voice_digest_notifier.py` and `tests/test_voice_digest_dispatch_job.py` for invalid env/config mode handling, status-artifact preservation, and the new targeted next-action guidance.
