@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Tightened the morning-handoff summary line so `scripts/voice_digest_morning_handoff.py` now prefers the actual milestone/change bullet from the latest progress entry instead of surfacing trailing `Learned:` or `Next step:` bullets when both are present.
+- Added `tests/test_voice_digest_morning_handoff.py` to lock in that progress-line selection behavior, including the fallback case when an entry only has verification/learned-style bullets.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_morning_handoff.py tests/test_voice_digest_morning_handoff.py` succeeded, `python3 -m unittest tests.test_voice_digest_morning_handoff` passed (2 tests), and a live `python3 scripts/voice_digest_morning_handoff.py --format text` run now shows the shipped scheduler-entrypoint milestone instead of the older `Learned:` summary line.
+- Learned: even a good progress log can feel stale in the morning if the handoff picks the reflective bullet instead of the concrete change; summary selection is part of the product.
+- Next step: keep tightening the morning-facing contract around real delivery readiness, especially once the real input path and destination wiring are available for the first live run.
+
+### 2026-03-28
 - Surfaced notifier readiness through the top-level scheduler entrypoint: `scripts/voice_digest_dispatch_job.py --check-setup` now regenerates the morning artifacts, runs the notifier's existing readiness probe, and still writes stable `delivery_status.json` / `delivery_status.txt` outputs so overnight or cron-style preflight runs leave one place to inspect the current blocker.
 - Taught the dispatch status contract about this new blocked-vs-ready preflight state, including setup blocker lines plus targeted next-step guidance when the remaining issue is missing input, missing destination wiring, invalid audio-mode config, or missing `openclaw`.
 - Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for both command construction and the blocked status-artifact shape.

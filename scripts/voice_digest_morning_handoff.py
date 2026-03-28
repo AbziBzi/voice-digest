@@ -84,11 +84,24 @@ def render_progress_line(progress_entry: list[str]) -> str:
         for line in progress_entry
         if line.strip().startswith("-")
     ]
-    for line in reversed(bullet_lines):
+
+    secondary_prefixes = (
+        "verification passed",
+        "verification:",
+        "live repo check:",
+        "learned:",
+        "next step:",
+    )
+
+    for line in bullet_lines:
+        if not line.lower().startswith(secondary_prefixes):
+            return line
+
+    for line in bullet_lines:
         if not line.lower().startswith("next step:"):
             return line
     if bullet_lines:
-        return bullet_lines[-1]
+        return bullet_lines[0]
     if progress_entry:
         return progress_entry[-1].strip()
     return "No progress entry found."
