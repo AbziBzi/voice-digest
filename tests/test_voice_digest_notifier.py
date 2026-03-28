@@ -19,6 +19,19 @@ spec.loader.exec_module(module)
 
 
 class VoiceDigestNotifierTests(unittest.TestCase):
+    def sample_live_payload(self, tmp: Path) -> dict[str, object]:
+        return {
+            "mode": "live",
+            "notifier_action": "send_audio",
+            "delivery_kind": "audio",
+            "delivery_target": str(tmp / "digest.mp3"),
+            "run": {"selected_input": "digest.txt"},
+            "summary": {
+                "spoken_preview": "Quick preview",
+                "source_digest": "Daily AI digest",
+            },
+        }
+
     def test_render_error_json_includes_plan_and_process_details(self) -> None:
         rendered = module.render_error_json(
             "send failed",
@@ -196,6 +209,61 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertIn(str(config_path), result["diagnostics"]["config_load_error"])
             self.assertEqual(result["diagnostics"]["config_has_channel"], False)
             self.assertEqual(result["diagnostics"]["config_has_target"], False)
+
+    def test_build_message_plan_auto_uses_caption_when_handoff_is_too_long(self) -> None:
+        payload = self.sample_live_payload(Path("/tmp"))
+        long_handoff = "A" * (module.MAX_AUDIO_MESSAGE_TEXT_LENGTH + 25)
+
+        plan = module.build_message_plan(
+            payload,
+            long_handoff,
+            "signal",
+            "+37060000000",
+            "cli",
+            "auto",
+            "cli",
+        )
+
+        self.assertEqual(plan["requested_audio_message_mode"], "auto")
+        self.assertEqual(plan["audio_message_mode"], "caption")
+        self.assertEqual(plan["audio_message_mode_reason"], "auto_caption_handoff_too_long")
+        self.assertLess(plan["message_text_length"], len(long_handoff))
+        self.assertEqual(plan["max_audio_message_text_length"], module.MAX_AUDIO_MESSAGE_TEXT_LENGTH)
+
+    def test_main_preview_json_preserves_auto_resolution_details(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
+            handoff_path.write_text("B" * (module.MAX_AUDIO_MESSAGE_TEXT_LENGTH + 50), encoding="utf-8")
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel="signal",
+                target="+37060000000",
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode="auto",
+                send=False,
+                openclaw_dry_run=False,
+                json=True,
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch(
+                "sys.stdout", new_callable=io.StringIO
+            ) as stdout:
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 0)
+            result = json.loads(stdout.getvalue())
+            self.assertEqual(result["status"], "preview")
+            self.assertEqual(result["requested_audio_message_mode"], "auto")
+            self.assertEqual(result["audio_message_mode"], "caption")
+            self.assertEqual(result["audio_message_mode_source"], "cli")
+            self.assertEqual(result["audio_message_mode_reason"], "auto_caption_handoff_too_long")
+            self.assertEqual(result["max_audio_message_text_length"], module.MAX_AUDIO_MESSAGE_TEXT_LENGTH)
+            self.assertLess(result["message_text_length"], module.MAX_AUDIO_MESSAGE_TEXT_LENGTH)
 
 
 if __name__ == "__main__":

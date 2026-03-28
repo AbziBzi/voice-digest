@@ -49,7 +49,7 @@ What they do:
 - `voice_digest_checkpoint.py` emits a compact overnight checkpoint with git state, the latest progress entry, and latest-run validation when a handoff file exists
 - `voice_digest_morning_handoff.py` combines the checkpoint plus delivery payload into one concise morning-ready text or JSON handoff, including run/input freshness lines for faster morning triage
 - `voice_digest_morning_job.py` runs the scheduler flow end-to-end and writes stable `morning_handoff.txt`, `morning_handoff.json`, and `delivery_payload.json` outputs for a cron job or notifier to consume
-- `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode, with support for either the full handoff text or a shorter caption as the live audio message body
+- `voice_digest_openclaw_notifier.py` reads those stable outputs and turns them into an `openclaw message send` call that either attaches audio in live mode or sends a text fallback in dry-run mode, with support for the full handoff text, a shorter caption, or an `auto` mode that falls back to the caption when the handoff is too long for a comfortable live message body
 - `voice_digest_dispatch_job.py` runs the morning job plus notifier together and always writes stable `delivery_status.json` and `delivery_status.txt` files so cron can tell whether the send path succeeded or where it failed
 - the TTS step prefers ElevenLabs, falls back to OpenAI TTS when ElevenLabs credentials/availability are the blocker, and only then falls back to a dry-run note at `OUTPUT.mp3.dry-run.txt`
 
@@ -198,7 +198,7 @@ Or via a repo-local config file at `.voice_digest_notifier.json`:
 }
 ```
 
-The notifier resolves the destination in this order: CLI args, then env vars, then config file. For live audio sends, `audio_message_mode` follows the same precedence: CLI flag, then `VOICE_DIGEST_AUDIO_MESSAGE_MODE`, then config file, then `full`.
+The notifier resolves the destination in this order: CLI args, then env vars, then config file. For live audio sends, `audio_message_mode` follows the same precedence: CLI flag, then `VOICE_DIGEST_AUDIO_MESSAGE_MODE`, then config file, then `full`. Supported values are `full`, `caption`, and `auto`; `auto` keeps the full handoff until it exceeds the notifier's safe message-length budget, then switches to the shorter caption automatically.
 
 To verify the real OpenClaw send path without delivering a message:
 
@@ -223,10 +223,22 @@ python3 scripts/voice_digest_openclaw_notifier.py \
   --audio-message-mode caption
 ```
 
+If you want the notifier to keep the full handoff when it is reasonably short but automatically switch to the shorter caption for long morning summaries, use auto mode:
+
+```bash
+python3 scripts/voice_digest_openclaw_notifier.py \
+  --send \
+  --audio-message-mode auto
+```
+
 Or set it once for the scheduler environment:
 
 ```bash
 export VOICE_DIGEST_AUDIO_MESSAGE_MODE=caption
+```
+
+```bash
+export VOICE_DIGEST_AUDIO_MESSAGE_MODE=auto
 ```
 
 For one scheduler-facing command that builds the morning artifacts, exercises the notifier, and leaves stable delivery-status files behind:

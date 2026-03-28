@@ -139,7 +139,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--audio-message-mode",
-        choices=["full", "caption"],
+        choices=["full", "caption", "auto"],
         help="Message-body mode passed through to the notifier for live audio sends.",
     )
     parser.add_argument(
@@ -461,6 +461,9 @@ def render_status_text(status: dict[str, Any]) -> str:
         requested_mode = dispatch.get("requested_audio_message_mode")
         resolved_mode = dispatch.get("resolved_audio_message_mode")
         resolved_mode_source = dispatch.get("audio_message_mode_source")
+        resolved_mode_reason = dispatch.get("audio_message_mode_reason")
+        message_text_length = dispatch.get("message_text_length")
+        max_message_text_length = dispatch.get("max_audio_message_text_length")
         if input_dir:
             lines.append(f"input_dir: {input_dir}")
         if input_dir_source:
@@ -473,6 +476,12 @@ def render_status_text(status: dict[str, Any]) -> str:
             lines.append(f"resolved_audio_message_mode: {resolved_mode}")
         if resolved_mode_source:
             lines.append(f"audio_message_mode_source: {resolved_mode_source}")
+        if resolved_mode_reason:
+            lines.append(f"audio_message_mode_reason: {resolved_mode_reason}")
+        if message_text_length is not None:
+            lines.append(f"message_text_length: {message_text_length}")
+        if max_message_text_length is not None:
+            lines.append(f"max_audio_message_text_length: {max_message_text_length}")
 
     error = status.get("error")
     if isinstance(error, dict):
@@ -686,8 +695,12 @@ def main() -> int:
                 "target": plan.get("target"),
                 "source": plan.get("destination_source"),
             }
+            status["dispatch"]["requested_audio_message_mode"] = plan.get("requested_audio_message_mode", status["dispatch"].get("requested_audio_message_mode"))
             status["dispatch"]["resolved_audio_message_mode"] = plan.get("audio_message_mode")
             status["dispatch"]["audio_message_mode_source"] = plan.get("audio_message_mode_source")
+            status["dispatch"]["audio_message_mode_reason"] = plan.get("audio_message_mode_reason")
+            status["dispatch"]["message_text_length"] = plan.get("message_text_length")
+            status["dispatch"]["max_audio_message_text_length"] = plan.get("max_audio_message_text_length")
 
     if notifier_result.returncode != 0:
         status["status"] = "failed"

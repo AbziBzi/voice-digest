@@ -11,6 +11,14 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Added an `auto` live-audio message-body mode to the OpenClaw notifier/dispatch path, so morning sends can keep the full handoff when it is concise but automatically fall back to the shorter caption when the handoff grows past a safe message-length budget.
+- The notifier preview/send plan now records both the requested mode and the resolved live mode plus the reason, message length, and configured limit; `delivery_status.json` / `delivery_status.txt` preserve those fields for scheduler-visible morning triage.
+- Updated regression coverage in `tests/test_voice_digest_notifier.py` and `tests/test_voice_digest_dispatch_job.py` for auto-mode resolution and status-artifact preservation.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py scripts/voice_digest_dispatch_job.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed (15 tests), and a temp `scripts/voice_digest_dispatch_job.py --dry-run --send --openclaw-dry-run --audio-message-mode auto ...` run wrote `out/delivery_status.txt` with `audio_message_mode_reason: auto_caption_handoff_too_long` plus the message-length fields.
+- Learned: manual `full` vs `caption` selection was an avoidable operational choice for the first real morning sends; the notifier can make the safer call automatically while still surfacing exactly what it decided.
+- Next step: run one non-`--dry-run` audio-producing dispatch with `--audio-message-mode auto` against the intended input path and destination wiring, then confirm whether the safe-length threshold needs tuning from real delivery feedback.
+
+### 2026-03-28
 - Hardened malformed-config triage for the notifier path: `scripts/voice_digest_openclaw_notifier.py` now preserves destination diagnostics even when `.voice_digest_notifier.json` exists but contains invalid JSON, records a `config_load_error` field, and reports the config path directly in the error text instead of failing without wiring context.
 - Taught `scripts/voice_digest_dispatch_job.py` to carry that `config_load_error` through into `delivery_status.json` / `delivery_status.txt` and to emit a specific `next_action` for the malformed-config case instead of treating it like a generic transport failure or missing destination.
 - Added regression coverage in `tests/test_voice_digest_notifier.py` and `tests/test_voice_digest_dispatch_job.py` for invalid-config handling, status-artifact preservation, and the new targeted next-step guidance.

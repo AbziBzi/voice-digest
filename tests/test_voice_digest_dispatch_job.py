@@ -79,7 +79,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 channel=None,
                 target=None,
                 config_path=tmp / ".voice_digest_notifier.json",
-                audio_message_mode="caption",
+                audio_message_mode="auto",
                 send=True,
                 openclaw_dry_run=True,
             )
@@ -112,8 +112,12 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                     "channel": "signal",
                     "target": "+37060000000",
                     "destination_source": "config",
+                    "requested_audio_message_mode": "auto",
                     "audio_message_mode": "caption",
                     "audio_message_mode_source": "config",
+                    "audio_message_mode_reason": "auto_caption_handoff_too_long",
+                    "message_text_length": 122,
+                    "max_audio_message_text_length": 1200,
                 },
             }
             notifier_result = CompletedProcess(
@@ -172,8 +176,12 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["destination"]["source"], "config")
             self.assertEqual(status["dispatch"]["input_dir"], str(tmp / "wired-digests"))
             self.assertEqual(status["dispatch"]["input_dir_source"], "env")
+            self.assertEqual(status["dispatch"]["requested_audio_message_mode"], "auto")
             self.assertEqual(status["dispatch"]["resolved_audio_message_mode"], "caption")
             self.assertEqual(status["dispatch"]["audio_message_mode_source"], "config")
+            self.assertEqual(status["dispatch"]["audio_message_mode_reason"], "auto_caption_handoff_too_long")
+            self.assertEqual(status["dispatch"]["message_text_length"], 122)
+            self.assertEqual(status["dispatch"]["max_audio_message_text_length"], 1200)
             self.assertEqual(status["summary"]["run_age_minutes"], 12.5)
             self.assertEqual(status["summary"]["selected_input_details"]["age_minutes"], 9.0)
             self.assertEqual(status["summary"]["delivery_target_details"]["size_bytes"], 4567)
@@ -193,6 +201,11 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("delivery_target_exists: True", status_text)
             self.assertIn("delivery_target_size_bytes: 4567", status_text)
             self.assertIn("delivery_target_age_minutes: 7.0", status_text)
+            self.assertIn("requested_audio_message_mode: auto", status_text)
+            self.assertIn("resolved_audio_message_mode: caption", status_text)
+            self.assertIn("audio_message_mode_reason: auto_caption_handoff_too_long", status_text)
+            self.assertIn("message_text_length: 122", status_text)
+            self.assertIn("max_audio_message_text_length: 1200", status_text)
             self.assertIn("next_action: Inspect the notifier send error detail", status_text)
 
     def test_derive_next_action_flags_missing_destination_wiring(self) -> None:

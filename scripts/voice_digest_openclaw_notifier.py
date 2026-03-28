@@ -18,6 +18,7 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / ".voice_digest_notifier.json"
 DEFAULT_CHANNEL_ENV = "VOICE_DIGEST_OPENCLAW_CHANNEL"
 DEFAULT_TARGET_ENV = "VOICE_DIGEST_OPENCLAW_TARGET"
 DEFAULT_AUDIO_MESSAGE_MODE_ENV = "VOICE_DIGEST_AUDIO_MESSAGE_MODE"
+MAX_AUDIO_MESSAGE_TEXT_LENGTH = 1200
 
 
 def parse_args() -> argparse.Namespace:
@@ -64,10 +65,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--audio-message-mode",
-        choices=["full", "caption"],
+        choices=["full", "caption", "auto"],
         help=(
             "How to build the message body when sending live audio. `full` sends the whole morning handoff, "
-            "while `caption` sends a shorter summary. Defaults to CLI override, then $"
+            "`caption` sends a shorter summary, and `auto` uses the full handoff until it exceeds the safe length "
+            f"budget ({MAX_AUDIO_MESSAGE_TEXT_LENGTH} chars) before falling back to the shorter caption. "
+            "Defaults to CLI override, then $"
             f"{DEFAULT_AUDIO_MESSAGE_MODE_ENV}, then config file, then full."
         ),
     )
@@ -172,7 +175,7 @@ def resolve_destination(args: argparse.Namespace, config: dict[str, object]) -> 
     return channel, target, source
 
 
-def resolve_audio_message_mode(
+def resolve_audio_message_mode_setting(
     args: argparse.Namespace,
     config: dict[str, object],
 ) -> tuple[str, str]:
@@ -181,11 +184,24 @@ def resolve_audio_message_mode(
 
     if args.audio_message_mode:
         return args.audio_message_mode, "cli"
-    if isinstance(env_mode, str) and env_mode in {"full", "caption"}:
+    if isinstance(env_mode, str) and env_mode in {"full", "caption", "auto"}:
         return env_mode, "env"
-    if isinstance(config_mode, str) and config_mode in {"full", "caption"}:
+    if isinstance(config_mode, str) and config_mode in {"full", "caption", "auto"}:
         return config_mode, "config"
     return "full", "default"
+
+
+def resolve_audio_message_mode(
+    requested_mode: str,
+    handoff_text: str,
+) -> tuple[str, str]:
+    if requested_mode == "auto":
+        if len(handoff_text) <= MAX_AUDIO_MESSAGE_TEXT_LENGTH:
+            return "full", "auto_full_within_limit"
+        return "caption", "auto_caption_handoff_too_long"
+    if requested_mode in {"full", "caption"}:
+        return requested_mode, "requested"
+    raise ValueError(f"unsupported audio_message_mode: {requested_mode}")
 
 
 def build_audio_caption(payload: dict[str, object]) -> str:
@@ -222,7 +238,8 @@ def build_message_plan(
     channel: str,
     target: str,
     destination_source: str,
-    audio_message_mode: str,
+    requested_audio_message_mode: str,
+    audio_message_mode_source: str,
 ) -> dict[str, object]:
     notifier_action = payload.get("notifier_action")
     delivery_kind = payload.get("delivery_kind")
@@ -248,8 +265,13 @@ def build_message_plan(
         target,
     ]
 
+    resolved_audio_message_mode, audio_message_mode_reason = resolve_audio_message_mode(
+        requested_audio_message_mode,
+        handoff_text,
+    )
+
     message_text = handoff_text
-    if notifier_action == "send_audio" and audio_message_mode == "caption":
+    if notifier_action == "send_audio" and resolved_audio_message_mode == "caption":
         message_text = build_audio_caption(payload)
 
     if notifier_action == "send_audio":
@@ -269,7 +291,12 @@ def build_message_plan(
         "notifier_action": notifier_action,
         "delivery_kind": delivery_kind,
         "delivery_target": delivery_target,
-        "audio_message_mode": audio_message_mode,
+        "requested_audio_message_mode": requested_audio_message_mode,
+        "audio_message_mode": resolved_audio_message_mode,
+        "audio_message_mode_source": audio_message_mode_source,
+        "audio_message_mode_reason": audio_message_mode_reason,
+        "message_text_length": len(message_text),
+        "max_audio_message_text_length": MAX_AUDIO_MESSAGE_TEXT_LENGTH,
         "command": command,
     }
 
@@ -339,16 +366,16 @@ def main() -> int:
             raise
         diagnostics = build_destination_diagnostics(args, config)
         channel, target, destination_source = resolve_destination(args, config)
-        audio_message_mode, audio_message_mode_source = resolve_audio_message_mode(args, config)
+        requested_audio_message_mode, audio_message_mode_source = resolve_audio_message_mode_setting(args, config)
         plan = build_message_plan(
             payload,
             handoff_text,
             channel,
             target,
             destination_source,
-            audio_message_mode,
+            requested_audio_message_mode,
+            audio_message_mode_source,
         )
-        plan["audio_message_mode_source"] = audio_message_mode_source
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         if args.json:
             sys.stdout.write(render_error_json(str(exc), diagnostics=diagnostics))
@@ -367,8 +394,12 @@ def main() -> int:
             print(f"destination source: {plan['destination_source']}")
             print(f"action: {plan['notifier_action']}")
             print(f"delivery: {plan['delivery_kind']} -> {plan['delivery_target']}")
+            print(f"requested audio message mode: {plan['requested_audio_message_mode']}")
             print(f"audio message mode: {plan['audio_message_mode']}")
             print(f"audio message mode source: {plan['audio_message_mode_source']}")
+            print(f"audio message mode reason: {plan['audio_message_mode_reason']}")
+            print(f"message text length: {plan['message_text_length']}")
+            print(f"max audio message text length: {plan['max_audio_message_text_length']}")
             print("command:")
             print(render_preview(plan))
         return 0
