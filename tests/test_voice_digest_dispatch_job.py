@@ -138,7 +138,14 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                         "size_bytes": 321,
                         "modified_at": "2026-03-27T18:00:00+00:00",
                         "age_minutes": 9.0,
-                    }
+                    },
+                    "delivery_target_details": {
+                        "path": str(tmp / "out" / "runs" / "digest.mp3"),
+                        "exists": True,
+                        "size_bytes": 4567,
+                        "modified_at": "2026-03-27T18:02:00+00:00",
+                        "age_minutes": 7.0,
+                    },
                 },
             }
 
@@ -169,6 +176,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["dispatch"]["audio_message_mode_source"], "config")
             self.assertEqual(status["summary"]["run_age_minutes"], 12.5)
             self.assertEqual(status["summary"]["selected_input_details"]["age_minutes"], 9.0)
+            self.assertEqual(status["summary"]["delivery_target_details"]["size_bytes"], 4567)
             self.assertEqual(status["diagnostics"]["config_exists"], True)
             self.assertEqual(status["diagnostics"]["config_has_channel"], True)
             self.assertEqual(
@@ -182,6 +190,9 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("run_age_minutes: 12.5", status_text)
             self.assertIn("selected_input_age_minutes: 9.0", status_text)
             self.assertIn("selected_input_size_bytes: 321", status_text)
+            self.assertIn("delivery_target_exists: True", status_text)
+            self.assertIn("delivery_target_size_bytes: 4567", status_text)
+            self.assertIn("delivery_target_age_minutes: 7.0", status_text)
             self.assertIn("next_action: Inspect the notifier send error detail", status_text)
 
     def test_derive_next_action_flags_missing_destination_wiring(self) -> None:

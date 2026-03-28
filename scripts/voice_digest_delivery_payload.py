@@ -77,16 +77,16 @@ def age_minutes_from(timestamp: datetime) -> float:
     return round((datetime.now(timezone.utc) - timestamp).total_seconds() / 60, 1)
 
 
-def describe_selected_input(selected_input: str) -> dict[str, object]:
-    selected_path = Path(selected_input)
+def describe_file(path_value: str) -> dict[str, object]:
+    path = Path(path_value)
     details: dict[str, object] = {
-        "path": selected_input,
-        "exists": selected_path.is_file(),
+        "path": path_value,
+        "exists": path.is_file(),
     }
-    if not selected_path.is_file():
+    if not path.is_file():
         return details
 
-    stat = selected_path.stat()
+    stat = path.stat()
     modified_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
     details.update(
         {
@@ -96,6 +96,10 @@ def describe_selected_input(selected_input: str) -> dict[str, object]:
         }
     )
     return details
+
+
+def describe_selected_input(selected_input: str) -> dict[str, object]:
+    return describe_file(selected_input)
 
 
 def build_delivery_payload(
@@ -154,6 +158,7 @@ def build_delivery_payload(
             "voice_id_override": inputs.get("voice_id_override"),
             "model_id_override": inputs.get("model_id_override"),
             "selected_input_details": describe_selected_input(selected_input),
+            "delivery_target_details": describe_file(delivery_target),
         },
     }
 

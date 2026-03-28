@@ -402,6 +402,7 @@ def render_status_text(status: dict[str, Any]) -> str:
         delivery_target = summary.get("delivery_target")
         run_age_minutes = summary.get("run_age_minutes")
         selected_input_details = summary.get("selected_input_details")
+        delivery_target_details = summary.get("delivery_target_details")
         if mode:
             lines.append(f"mode: {mode}")
         if selected_input:
@@ -422,6 +423,19 @@ def render_status_text(status: dict[str, Any]) -> str:
                 lines.append(f"selected_input_modified_at: {input_modified}")
             if input_size is not None:
                 lines.append(f"selected_input_size_bytes: {input_size}")
+        if isinstance(delivery_target_details, dict):
+            delivery_exists = delivery_target_details.get("exists")
+            delivery_size = delivery_target_details.get("size_bytes")
+            delivery_modified = delivery_target_details.get("modified_at")
+            delivery_age = delivery_target_details.get("age_minutes")
+            if delivery_exists is not None:
+                lines.append(f"delivery_target_exists: {delivery_exists}")
+            if delivery_size is not None:
+                lines.append(f"delivery_target_size_bytes: {delivery_size}")
+            if delivery_modified:
+                lines.append(f"delivery_target_modified_at: {delivery_modified}")
+            if delivery_age is not None:
+                lines.append(f"delivery_target_age_minutes: {delivery_age}")
 
     destination = status.get("destination")
     if isinstance(destination, dict):
@@ -630,6 +644,11 @@ def main() -> int:
             if isinstance(payload_summary, dict)
             else None
         )
+        delivery_target_details = (
+            payload_summary.get("delivery_target_details")
+            if isinstance(payload_summary, dict)
+            else None
+        )
         status["summary"] = {
             "mode": payload.get("mode"),
             "notifier_action": payload.get("notifier_action"),
@@ -638,6 +657,7 @@ def main() -> int:
             "selected_input": run_summary.get("selected_input") if isinstance(run_summary, dict) else None,
             "run_age_minutes": run_summary.get("age_minutes") if isinstance(run_summary, dict) else None,
             "selected_input_details": selected_input_details if isinstance(selected_input_details, dict) else None,
+            "delivery_target_details": delivery_target_details if isinstance(delivery_target_details, dict) else None,
         }
 
     notifier_json: dict[str, Any] | None = None
