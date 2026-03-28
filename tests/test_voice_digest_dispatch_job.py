@@ -171,6 +171,10 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["summary"]["selected_input_details"]["age_minutes"], 9.0)
             self.assertEqual(status["diagnostics"]["config_exists"], True)
             self.assertEqual(status["diagnostics"]["config_has_channel"], True)
+            self.assertEqual(
+                status["next_action"],
+                "Inspect the notifier send error detail, fix the delivery wiring or transport issue, then rerun with --send --openclaw-dry-run.",
+            )
 
             status_text = args.status_text_path.read_text(encoding="utf-8")
             self.assertIn(f"input_dir: {tmp / 'wired-digests'}", status_text)
@@ -178,6 +182,81 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("run_age_minutes: 12.5", status_text)
             self.assertIn("selected_input_age_minutes: 9.0", status_text)
             self.assertIn("selected_input_size_bytes: 321", status_text)
+            self.assertIn("next_action: Inspect the notifier send error detail", status_text)
+
+    def test_derive_next_action_flags_missing_destination_wiring(self) -> None:
+        send_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_send",
+                "detail": "destination is required",
+            },
+            "diagnostics": {
+                "config_has_channel": False,
+                "config_has_target": False,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(send_status),
+            "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun with --send --openclaw-dry-run.",
+        )
+
+        preview_status = {
+            "status": "failed",
+            "error": {
+                "stage": "notifier_preview",
+                "detail": "destination is required",
+            },
+            "diagnostics": {
+                "config_has_channel": False,
+                "config_has_target": False,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(preview_status),
+            "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun the preview or send path.",
+        )
+
+    def test_derive_next_action_flags_missing_input_drop(self) -> None:
+        status = {
+            "status": "failed",
+            "error": {
+                "stage": "morning_job",
+                "detail": "error: input directory /tmp/incoming_digests does not exist. Create it or point --input-dir at the real upstream digest drop.",
+            },
+            "dispatch": {
+                "input_dir": "/tmp/incoming_digests",
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Populate /tmp/incoming_digests with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun the dispatch job.",
+        )
+
+    def test_derive_next_action_guides_after_successful_send_dry_run(self) -> None:
+        status = {
+            "status": "succeeded",
+            "dispatch": {
+                "send": True,
+                "openclaw_dry_run": True,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Send-path verification passed; the next milestone is one true live dispatch run without --openclaw-dry-run once the destination/input wiring is confirmed.",
+        )
 
 
 if __name__ == "__main__":

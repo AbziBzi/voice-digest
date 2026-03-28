@@ -11,6 +11,19 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-28
+- Added morning-readable `next_action` guidance to `scripts/voice_digest_dispatch_job.py`, and threaded it into both `delivery_status.json` and `delivery_status.txt` for common states: missing input drop, missing destination wiring, missing `openclaw` CLI, preview-only success, and send-path dry-run success.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for the new hinting logic, including missing-input, missing-destination (preview and send), successful send dry-run, and status-artifact rendering.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest discover -s tests -p 'test_*.py'` passed (14 tests), and a temp end-to-end dispatch run with a sample digest now writes `delivery_status.txt` with a concrete `next_action:` line instead of only raw notifier failure text.
+- Learned: the repo was already good at preserving failure detail, but sleepy morning triage still required humans to infer the intended follow-up; one small explicit hint makes the stable handoff materially more actionable.
+- Next step: wire Edwin's real destination and real upstream input path, then run the intended-config `python3 scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` before one true live dispatch.
+
+### 2026-03-28
+- Overnight review checkpoint: handoff docs are aligned, the repo is clean on `main`, and `python3 -m unittest discover -s tests -p 'test_*.py'` passed (11 tests).
+- The project is still operationally blocked for the next true milestone: there is no repo-local `.voice_digest_notifier.json`, so Edwin’s real OpenClaw/Signal destination is not wired here, and the remaining meaningful step is still the intended-config `--send --openclaw-dry-run` followed by one real live delivery.
+- Stopped cleanly without broadening scope, because anything beyond this checkpoint would either be synthetic-only rework or risky guessing about real destination wiring.
+- Next step: provision the real destination (env or local config), confirm the real upstream input path if it differs from `incoming_digests/`, then run `python3 scripts/voice_digest_dispatch_job.py --send --openclaw-dry-run` in that intended environment before one true live dispatch.
+
+### 2026-03-28
 - Tightened scheduler input wiring at the top-level entrypoint: `scripts/voice_digest_dispatch_job.py` can now resolve the upstream digest drop from `VOICE_DIGEST_INPUT_DIR` when `--input-dir` is omitted, and `delivery_status.json` / `delivery_status.txt` now record both the resolved `input_dir` and whether it came from `cli`, `env`, or the repo default.
 - Added regression coverage for both behaviors in `tests/test_voice_digest_dispatch_job.py`, including env-vs-default input resolution and a notifier-failure status artifact that preserves the env-resolved input path for cron debugging.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed, and a repo-root `VOICE_DIGEST_INPUT_DIR=<temp>/upstream python3 scripts/voice_digest_dispatch_job.py --dry-run --channel signal --target +37060000000` run completed successfully while `out/delivery_status.txt` showed `input_dir_source: env`.

@@ -308,6 +308,67 @@ def summarize_command_failure(
     return failure
 
 
+def derive_next_action(status: dict[str, Any]) -> str | None:
+    dispatch = status.get("dispatch")
+    dispatch = dispatch if isinstance(dispatch, dict) else {}
+    input_dir = dispatch.get("input_dir")
+    input_dir_display = str(input_dir) if input_dir else "incoming_digests/"
+
+    diagnostics = status.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+
+    error = status.get("error")
+    error = error if isinstance(error, dict) else {}
+    detail = error.get("detail")
+    detail_text = detail.lower() if isinstance(detail, str) else ""
+
+    if status.get("status") == "failed":
+        if error.get("stage") == "morning_job":
+            if "no digest files matched" in detail_text or "input directory" in detail_text:
+                return (
+                    f"Populate {input_dir_display} with a fresh digest text file or point the dispatch job at the real "
+                    "upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun the dispatch job."
+                )
+            return "Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun the dispatch job."
+
+        missing_destination = not any(
+            [
+                diagnostics.get("config_has_channel") and diagnostics.get("config_has_target"),
+                diagnostics.get("env_channel_set") and diagnostics.get("env_target_set"),
+                diagnostics.get("cli_channel_set") and diagnostics.get("cli_target_set"),
+            ]
+        )
+
+        if error.get("stage") == "notifier_send":
+            if "openclaw cli is not available" in detail_text or "openclaw cli could not be executed" in detail_text:
+                return "Ensure the openclaw CLI is installed and available on PATH for the scheduler environment, then rerun with --send --openclaw-dry-run."
+            if missing_destination:
+                return (
+                    "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / "
+                    "VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun with --send --openclaw-dry-run."
+                )
+            return "Inspect the notifier send error detail, fix the delivery wiring or transport issue, then rerun with --send --openclaw-dry-run."
+
+        if error.get("stage") == "notifier_preview":
+            if missing_destination:
+                return (
+                    "Provision the real OpenClaw destination via CLI flags, VOICE_DIGEST_OPENCLAW_CHANNEL / "
+                    "VOICE_DIGEST_OPENCLAW_TARGET, or .voice_digest_notifier.json, then rerun the preview or send path."
+                )
+            return "Fix the notifier preview error, then rerun the dispatch job without broadening scope."
+
+        return "Inspect the captured error detail in delivery_status.json and rerun only after the blocked stage is fixed."
+
+    if status.get("status") == "succeeded":
+        if dispatch.get("send") and dispatch.get("openclaw_dry_run"):
+            return "Send-path verification passed; the next milestone is one true live dispatch run without --openclaw-dry-run once the destination/input wiring is confirmed."
+        if dispatch.get("send"):
+            return "Live dispatch succeeded; review the delivered morning experience and choose any follow-up polish based on the real result."
+        return "Preview succeeded; once the destination wiring is ready, rerun with --send --openclaw-dry-run before the first true live dispatch."
+
+    return None
+
+
 def render_status_text(status: dict[str, Any]) -> str:
     lines = [
         "Voice Digest Delivery Status",
@@ -415,6 +476,10 @@ def render_status_text(status: dict[str, Any]) -> str:
             if key in diagnostics:
                 lines.append(f"  {key}: {diagnostics[key]}")
 
+    next_action = status.get("next_action")
+    if next_action:
+        lines.append(f"next_action: {next_action}")
+
     artifacts = status.get("artifacts")
     if isinstance(artifacts, dict):
         lines.append("artifacts:")
@@ -517,6 +582,7 @@ def main() -> int:
     if morning_result.returncode != 0:
         status["status"] = "failed"
         status["error"] = summarize_command_failure(morning_result, "morning_job")
+        status["next_action"] = derive_next_action(status)
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
         if morning_result.stdout:
@@ -590,6 +656,7 @@ def main() -> int:
             notifier_stage,
             parsed_json=notifier_json,
         )
+        status["next_action"] = derive_next_action(status)
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
         if morning_result.stdout:
@@ -606,6 +673,7 @@ def main() -> int:
 
     status["status"] = "succeeded"
     status["stage"] = "completed"
+    status["next_action"] = derive_next_action(status)
     finalize_status(status, iso_now(), started_at_dt)
     write_status(status, args.status_json_path, args.status_text_path)
 
