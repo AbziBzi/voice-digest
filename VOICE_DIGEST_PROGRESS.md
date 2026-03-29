@@ -11,6 +11,10 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-29
+- Overnight review checkpoint after the earlier doc/wiring work: the repo is still clean on `main`, and `python3 -m unittest discover -s tests -p 'test_*.py'` passed (31 tests).
+- A live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run is still blocked before the notifier stage because `incoming_digests/` has no real digest `*.txt` input here, which confirms the next meaningful milestone is environment wiring rather than more repo-side reshaping.
+- Stopped cleanly without broadening scope, because anything beyond this checkpoint would be synthetic churn or risky guessing about Edwin's real upstream input path / destination config.
+- Next step: populate `incoming_digests/` (or set `VOICE_DIGEST_INPUT_DIR`) in the intended environment, get `--check-setup` to `ready`, then run the intended-config `--send --openclaw-dry-run` before one true live delivery.
 - Added a checked-in `.voice_digest_notifier.example.json` and documented the concrete first-live path in `README.md` / `WORKFLOW.md`, so local notifier wiring no longer depends on reverse-engineering the expected config shape from scattered prose before the intended-config dry run.
 - The docs now include an explicit five-step readiness sequence: populate `incoming_digests/` (or set `VOICE_DIGEST_INPUT_DIR`), copy the example config into `.voice_digest_notifier.json`, run `--check-setup` until ready, run `--send --openclaw-dry-run`, then do the first live `--send`.
 - Verification passed in two layers: `python3 -m json.tool .voice_digest_notifier.example.json` succeeded, and a doc sanity pass confirmed the sample-config path plus first-live checklist are now present in both `README.md` and `WORKFLOW.md`.
