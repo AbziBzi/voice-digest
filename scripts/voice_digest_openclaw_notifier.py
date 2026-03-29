@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -360,10 +361,37 @@ def render_error_json(
     return json.dumps(payload, indent=2) + "\n"
 
 
+def describe_delivery_target(payload: dict[str, Any]) -> tuple[bool, str | None, str | None]:
+    notifier_action = payload.get("notifier_action")
+    delivery_kind = payload.get("delivery_kind")
+    delivery_target = payload.get("delivery_target")
+
+    if not isinstance(notifier_action, str) or not notifier_action.strip():
+        return False, None, "payload missing notifier_action"
+    if not isinstance(delivery_kind, str) or not delivery_kind.strip():
+        return False, None, "payload missing delivery_kind"
+    if not isinstance(delivery_target, str) or not delivery_target.strip():
+        return False, None, "payload missing delivery_target"
+
+    target_path = Path(delivery_target)
+    if not target_path.is_file():
+        return False, delivery_target, f"delivery target is missing: {delivery_target}"
+
+    if notifier_action == "send_audio" and delivery_kind != "audio":
+        return False, delivery_target, f"payload action/delivery mismatch: expected audio delivery for {notifier_action}"
+    if notifier_action == "send_text_fallback" and delivery_kind != "dry-run-note":
+        return False, delivery_target, f"payload action/delivery mismatch: expected dry-run-note delivery for {notifier_action}"
+
+    return True, delivery_target, None
+
+
 def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
     diagnostics: dict[str, object] | None = None
     payload_ready = False
     handoff_ready = False
+    delivery_target_ready = False
+    delivery_target: str | None = None
+    delivery_target_error: str | None = None
     config: dict[str, object] = {}
     config_error: str | None = None
     destination_error: str | None = None
@@ -375,8 +403,9 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
     audio_message_mode_source: str | None = None
 
     try:
-        load_json(args.payload_path)
+        payload = load_json(args.payload_path)
         payload_ready = True
+        delivery_target_ready, delivery_target, delivery_target_error = describe_delivery_target(payload)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         payload_error = str(exc)
     else:
@@ -430,6 +459,7 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
     ready = (
         payload_ready
         and handoff_ready
+        and delivery_target_ready
         and config_error is None
         and destination_error is None
         and audio_message_mode_error is None
@@ -441,6 +471,8 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
         blockers.append(payload_error)
     if handoff_error:
         blockers.append(handoff_error)
+    if delivery_target_error:
+        blockers.append(delivery_target_error)
     if config_error:
         blockers.append(config_error)
     if destination_error:
@@ -455,6 +487,7 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
         "ready": ready,
         "payload_ready": payload_ready,
         "handoff_ready": handoff_ready,
+        "delivery_target_ready": delivery_target_ready,
         "openclaw_available": openclaw_available,
         "diagnostics": diagnostics,
         "blockers": blockers,
@@ -463,6 +496,10 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
         report["payload_error"] = payload_error
     if handoff_error:
         report["handoff_error"] = handoff_error
+    if delivery_target:
+        report["delivery_target"] = delivery_target
+    if delivery_target_error:
+        report["delivery_target_error"] = delivery_target_error
     if config_error:
         report["config_error"] = config_error
     if destination_error:
@@ -488,12 +525,15 @@ def render_setup_report_text(report: dict[str, object]) -> str:
         f"ready: {report['ready']}",
         f"payload_ready: {report['payload_ready']}",
         f"handoff_ready: {report['handoff_ready']}",
+        f"delivery_target_ready: {report['delivery_target_ready']}",
         f"openclaw_available: {report['openclaw_available']}",
     ]
     if "channel" in report:
         lines.append(f"channel: {report['channel']}")
     if "target" in report:
         lines.append(f"target: {report['target']}")
+    if "delivery_target" in report:
+        lines.append(f"delivery_target: {report['delivery_target']}")
     if "destination_source" in report:
         lines.append(f"destination_source: {report['destination_source']}")
     if "requested_audio_message_mode" in report:

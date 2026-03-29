@@ -258,7 +258,7 @@ python3 scripts/voice_digest_dispatch_job.py \
   --check-setup
 ```
 
-That run still builds the current morning artifacts, then calls the notifier's readiness probe and writes stable `out/delivery_status.json` / `out/delivery_status.txt` outputs that say whether the remaining blocker is upstream input generation, destination wiring, config validity, or `openclaw` availability.
+That run still builds the current morning artifacts, then calls the notifier's readiness probe and writes stable `out/delivery_status.json` / `out/delivery_status.txt` outputs that say whether the remaining blocker is upstream input generation, the referenced delivery artifact itself missing, destination wiring, config validity, or `openclaw` availability.
 
 Recommended first-live checklist:
 

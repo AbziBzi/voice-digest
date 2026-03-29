@@ -284,6 +284,8 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             tmp = Path(tmpdir)
             payload_path = tmp / "delivery_payload.json"
             handoff_path = tmp / "morning_handoff.txt"
+            audio_path = tmp / "digest.mp3"
+            audio_path.write_bytes(b"ID3")
             payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
             handoff_path.write_text("Morning handoff", encoding="utf-8")
 
@@ -302,8 +304,38 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertFalse(report["ready"])
             self.assertTrue(report["payload_ready"])
             self.assertTrue(report["handoff_ready"])
+            self.assertTrue(report["delivery_target_ready"])
+            self.assertEqual(report["delivery_target"], str(audio_path))
             self.assertIn("destination is not configured", report["destination_error"])
             self.assertIn(report["destination_error"], report["blockers"])
+
+    def test_build_setup_report_marks_missing_delivery_target_as_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            payload_path = tmp / "delivery_payload.json"
+            handoff_path = tmp / "morning_handoff.txt"
+            payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
+            handoff_path.write_text("Morning handoff", encoding="utf-8")
+
+            args = Namespace(
+                payload_path=payload_path,
+                handoff_text_path=handoff_path,
+                channel="signal",
+                target="+37060000000",
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode="auto",
+            )
+
+            with mock.patch.object(module.shutil, "which", return_value="/usr/bin/openclaw"):
+                report = module.build_setup_report(args)
+
+            self.assertEqual(report["status"], "blocked")
+            self.assertFalse(report["ready"])
+            self.assertTrue(report["payload_ready"])
+            self.assertTrue(report["handoff_ready"])
+            self.assertFalse(report["delivery_target_ready"])
+            self.assertIn("delivery target is missing", report["delivery_target_error"])
+            self.assertIn(report["delivery_target_error"], report["blockers"])
 
     def test_main_check_setup_json_reports_ready_environment(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -311,6 +343,8 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             payload_path = tmp / "delivery_payload.json"
             handoff_path = tmp / "morning_handoff.txt"
             config_path = tmp / ".voice_digest_notifier.json"
+            audio_path = tmp / "digest.mp3"
+            audio_path.write_bytes(b"ID3")
             payload_path.write_text(json.dumps(self.sample_live_payload(tmp)), encoding="utf-8")
             handoff_path.write_text("Morning handoff", encoding="utf-8")
             config_path.write_text(
@@ -349,6 +383,8 @@ class VoiceDigestNotifierTests(unittest.TestCase):
             self.assertEqual(result["destination_source"], "config")
             self.assertEqual(result["requested_audio_message_mode"], "auto")
             self.assertEqual(result["audio_message_mode_source"], "config")
+            self.assertEqual(result["delivery_target"], str(audio_path))
+            self.assertEqual(result["delivery_target_ready"], True)
             self.assertEqual(result["diagnostics"]["config_exists"], True)
             self.assertEqual(result["blockers"], [])
 

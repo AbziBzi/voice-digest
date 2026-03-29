@@ -423,6 +423,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "ready": False,
                 "payload_ready": True,
                 "handoff_ready": True,
+                "delivery_target_ready": True,
                 "openclaw_available": True,
                 "blockers": ["destination is not configured"],
                 "diagnostics": {
@@ -492,6 +493,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertEqual(status["dispatch"]["check_setup"], True)
             self.assertEqual(status["dispatch"]["payload_ready"], True)
             self.assertEqual(status["dispatch"]["handoff_ready"], True)
+            self.assertEqual(status["dispatch"]["delivery_target_ready"], True)
             self.assertEqual(status["dispatch"]["openclaw_available"], True)
             self.assertEqual(status["dispatch"]["setup_blockers"], ["destination is not configured"])
             self.assertEqual(
@@ -503,9 +505,32 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("status: blocked", status_text)
             self.assertIn("payload_ready: True", status_text)
             self.assertIn("handoff_ready: True", status_text)
+            self.assertIn("delivery_target_ready: True", status_text)
             self.assertIn("openclaw_available: True", status_text)
             self.assertIn("setup_blocker: destination is not configured", status_text)
             self.assertIn("next_action: Provision the real OpenClaw destination", status_text)
+
+    def test_derive_next_action_flags_missing_delivery_target_for_check_setup(self) -> None:
+        status = {
+            "status": "blocked",
+            "error": {
+                "stage": "notifier_check_setup",
+                "detail": "delivery target is missing: /tmp/out/digest.mp3",
+            },
+            "diagnostics": {
+                "config_has_channel": True,
+                "config_has_target": True,
+                "env_channel_set": False,
+                "env_target_set": False,
+                "cli_channel_set": False,
+                "cli_target_set": False,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Regenerate the morning artifacts so the referenced audio or dry-run note exists at the payload's delivery_target path, then rerun --check-setup.",
+        )
 
     def test_derive_next_action_flags_missing_destination_wiring(self) -> None:
         send_status = {

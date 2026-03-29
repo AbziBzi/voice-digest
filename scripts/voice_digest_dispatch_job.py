@@ -393,6 +393,8 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
                 return "Fix VOICE_DIGEST_AUDIO_MESSAGE_MODE so it is one of full, caption, or auto, then rerun --check-setup."
             if invalid_audio_mode_source == "config":
                 return "Fix audio_message_mode in .voice_digest_notifier.json so it is one of full, caption, or auto, then rerun --check-setup."
+            if "delivery target is missing" in detail_text or '"delivery_target_ready": false' in detail_text:
+                return "Regenerate the morning artifacts so the referenced audio or dry-run note exists at the payload's delivery_target path, then rerun --check-setup."
             if "openclaw cli" in detail_text or '"openclaw_available": false' in detail_text:
                 return "Ensure the openclaw CLI is installed and available on PATH for the intended scheduler environment, then rerun --check-setup."
             missing_destination = not any(
@@ -573,6 +575,7 @@ def render_status_text(status: dict[str, Any]) -> str:
         max_message_text_length = dispatch.get("max_audio_message_text_length")
         payload_ready = dispatch.get("payload_ready")
         handoff_ready = dispatch.get("handoff_ready")
+        delivery_target_ready = dispatch.get("delivery_target_ready")
         openclaw_available = dispatch.get("openclaw_available")
         setup_blockers = dispatch.get("setup_blockers")
         if input_dir:
@@ -605,6 +608,8 @@ def render_status_text(status: dict[str, Any]) -> str:
             lines.append(f"payload_ready: {payload_ready}")
         if handoff_ready is not None:
             lines.append(f"handoff_ready: {handoff_ready}")
+        if delivery_target_ready is not None:
+            lines.append(f"delivery_target_ready: {delivery_target_ready}")
         if openclaw_available is not None:
             lines.append(f"openclaw_available: {openclaw_available}")
         if isinstance(setup_blockers, list):
@@ -618,12 +623,14 @@ def render_status_text(status: dict[str, Any]) -> str:
             "status",
             "channel",
             "target",
+            "delivery_target",
             "destination_source",
             "requested_audio_message_mode",
             "audio_message_mode",
             "audio_message_mode_source",
             "payload_ready",
             "handoff_ready",
+            "delivery_target_ready",
             "openclaw_available",
         ):
             value = downstream_notifier_check.get(key)
@@ -919,6 +926,7 @@ def main() -> int:
             if args.check_setup:
                 status["dispatch"]["payload_ready"] = plan.get("payload_ready")
                 status["dispatch"]["handoff_ready"] = plan.get("handoff_ready")
+                status["dispatch"]["delivery_target_ready"] = plan.get("delivery_target_ready")
                 status["dispatch"]["openclaw_available"] = plan.get("openclaw_available")
                 blockers = plan.get("blockers")
                 if isinstance(blockers, list):
