@@ -170,14 +170,16 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "status": "blocked",
                 "channel": "signal",
                 "target": "+37060000000",
+                "delivery_target": str(tmp / "out" / "runs" / "digest.mp3"),
                 "destination_source": "config",
                 "requested_audio_message_mode": "auto",
                 "audio_message_mode": "caption",
                 "audio_message_mode_source": "config",
                 "payload_ready": True,
                 "handoff_ready": True,
+                "delivery_target_ready": False,
                 "openclaw_available": True,
-                "blockers": ["destination is not configured"],
+                "blockers": ["delivery target is missing: /tmp/out/runs/digest.mp3"],
             }
             notifier_result = CompletedProcess(
                 args=["python3", "notifier", "--check-setup"],
@@ -212,8 +214,16 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "caption",
             )
             self.assertEqual(
+                status["downstream_notifier_check"]["delivery_target"],
+                str(tmp / "out" / "runs" / "digest.mp3"),
+            )
+            self.assertEqual(
                 status["downstream_notifier_check"]["payload_ready"],
                 True,
+            )
+            self.assertEqual(
+                status["downstream_notifier_check"]["delivery_target_ready"],
+                False,
             )
             self.assertEqual(
                 status["commands"]["downstream_notifier_check"].endswith("--check-setup"),
@@ -227,8 +237,10 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             status_text = args.status_text_path.read_text(encoding="utf-8")
             self.assertIn("downstream_notifier_check:", status_text)
             self.assertIn("  status: blocked", status_text)
+            self.assertIn(f"  delivery_target: {tmp / 'out' / 'runs' / 'digest.mp3'}", status_text)
             self.assertIn("  payload_ready: True", status_text)
-            self.assertIn("  blocker: destination is not configured", status_text)
+            self.assertIn("  delivery_target_ready: False", status_text)
+            self.assertIn("  blocker: delivery target is missing: /tmp/out/runs/digest.mp3", status_text)
 
     def test_main_writes_structured_notifier_failure_into_status_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

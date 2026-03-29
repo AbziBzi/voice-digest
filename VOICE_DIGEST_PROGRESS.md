@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-29
+- Tightened the scheduler-failure handoff so `scripts/voice_digest_dispatch_job.py` now preserves `delivery_target` and `delivery_target_ready` inside the downstream notifier snapshot it records after an upstream morning-job failure, instead of dropping those fields even though the notifier already computed them.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` so `delivery_status.json` / `delivery_status.txt` keep showing whether the referenced audio/dry-run artifact itself exists when the dispatch job dies before the notifier stage.
+- Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (20 tests), and the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (39 tests).
+- Learned: once notifier readiness started checking the real delivery artifact, the upstream-failure snapshot needed to preserve that same field or the top-level handoff would quietly lose the most actionable downstream clue.
+- Next step: run the richer `--check-setup` artifact in Edwin's intended environment so one failed preflight can still distinguish "input missing" from "audio artifact missing" before the first intended-config send-path run.
+
+### 2026-03-29
 - Tightened notifier readiness around the real delivery artifact: `scripts/voice_digest_openclaw_notifier.py --check-setup` now validates that the `delivery_target` referenced by `delivery_payload.json` actually exists and matches the expected live-vs-dry-run action shape, instead of reporting "ready" from payload/handoff/config alone.
 - Threaded that new readiness signal through `scripts/voice_digest_dispatch_job.py`, so `delivery_status.json` / `delivery_status.txt` now preserve `delivery_target_ready` and the scheduler-facing next action can point directly at regenerating the morning artifacts when the referenced audio or dry-run note is missing.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_openclaw_notifier.py scripts/voice_digest_dispatch_job.py tests/test_voice_digest_notifier.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_notifier tests.test_voice_digest_dispatch_job` passed (31 tests), and the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (39 tests). A live temp `python3 scripts/voice_digest_openclaw_notifier.py --check-setup --json ...` probe with a missing MP3 now returns `delivery_target_ready: false` plus a concrete `delivery target is missing: ...` blocker.
