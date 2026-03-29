@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-29
+- Tightened the top-level missing-input handoff: `scripts/voice_digest_dispatch_job.py --check-setup` now recognizes the real `no matching digest files found` morning-job error and writes a concrete `next_action` that points straight at populating `incoming_digests/` or setting `--input-dir` / `VOICE_DIGEST_INPUT_DIR`.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for that exact empty-drop stderr shape so the morning status artifact keeps the actionable guidance even if the top-level run dies before notifier setup.
+- Verification passed in three layers: `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (14 tests), the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (32 tests), and a live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run now writes `out/delivery_status.txt` with the explicit populate-input-dir / use-VOICE_DIGEST_INPUT_DIR next step.
+- Learned: once the repo-side work narrows to real environment wiring, the morning handoff has to be precise about the exact remaining blocker; generic “inspect the morning-job error” text is too mushy for sleepy triage.
+- Next step: populate the real upstream digest drop (or set `VOICE_DIGEST_INPUT_DIR`) in the intended environment, get `--check-setup` to `ready`, then repeat the intended-config `--send --openclaw-dry-run` before one true live delivery.
+
+### 2026-03-29
 - Overnight review checkpoint after the earlier doc/wiring work: the repo is still clean on `main`, and `python3 -m unittest discover -s tests -p 'test_*.py'` passed (31 tests).
 - A live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run is still blocked before the notifier stage because `incoming_digests/` has no real digest `*.txt` input here, which confirms the next meaningful milestone is environment wiring rather than more repo-side reshaping.
 - Stopped cleanly without broadening scope, because anything beyond this checkpoint would be synthetic churn or risky guessing about Edwin's real upstream input path / destination config.

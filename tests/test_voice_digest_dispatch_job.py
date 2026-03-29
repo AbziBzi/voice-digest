@@ -674,6 +674,24 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             "Populate /tmp/incoming_digests with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun the dispatch job.",
         )
 
+    def test_derive_next_action_flags_missing_input_drop_when_no_matching_files_found(self) -> None:
+        status = {
+            "status": "failed",
+            "error": {
+                "stage": "morning_job",
+                "detail": "error: no matching digest files found in /tmp/incoming_digests for glob '*.txt'",
+            },
+            "dispatch": {
+                "input_dir": "/tmp/incoming_digests",
+                "check_setup": True,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Populate /tmp/incoming_digests with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun --check-setup.",
+        )
+
     def test_derive_next_action_flags_tts_dry_run_text_fallback_after_success(self) -> None:
         status = {
             "status": "succeeded",

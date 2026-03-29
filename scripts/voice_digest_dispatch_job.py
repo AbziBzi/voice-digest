@@ -366,7 +366,11 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
 
     if status.get("status") == "failed":
         if error.get("stage") == "morning_job":
-            if "no digest files matched" in detail_text or "input directory" in detail_text:
+            if (
+                "no digest files matched" in detail_text
+                or "no matching digest files found" in detail_text
+                or "input directory" in detail_text
+            ):
                 rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
                 return (
                     f"Populate {input_dir_display} with a fresh digest text file or point the dispatch job at the real "
