@@ -231,7 +231,7 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             )
             self.assertEqual(
                 status["next_action"],
-                "Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun --check-setup.",
+                f"Populate {module.DEFAULT_INPUT_DIR} with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun --check-setup.",
             )
 
             status_text = args.status_text_path.read_text(encoding="utf-8")
@@ -936,6 +936,26 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             },
             "dispatch": {
                 "input_dir": "/tmp/incoming_digests",
+                "check_setup": True,
+            },
+        }
+
+        self.assertEqual(
+            module.derive_next_action(status),
+            "Populate /tmp/incoming_digests with a fresh digest text file or point the dispatch job at the real upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun --check-setup.",
+        )
+
+    def test_derive_next_action_uses_input_diagnostics_when_morning_job_error_is_generic(self) -> None:
+        status = {
+            "status": "failed",
+            "error": {
+                "stage": "morning_job",
+                "detail": "morning_job failed with exit code 1",
+            },
+            "dispatch": {
+                "input_dir": "/tmp/incoming_digests",
+                "input_dir_exists": True,
+                "input_match_count": 0,
                 "check_setup": True,
             },
         }

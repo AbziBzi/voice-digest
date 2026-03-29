@@ -11,6 +11,20 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-29
+- Tightened the scheduler-facing `next_action` fallback in `scripts/voice_digest_dispatch_job.py` so a morning-job failure now still points at the real empty-input-drop fix when the subprocess only bubbles up a generic exit-code summary; it now uses the dispatcher's own `input_dir_exists` / `input_match_count` diagnostics as a second signal instead of relying only on stderr text matching.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for that generic-error + zero-input-candidates shape, and updated the existing morning-job-failure test to expect the now-more-specific guidance.
+- Verification passed in two layers: `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (21 tests), and a live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run now writes `out/delivery_status.txt` with the concrete populate-input-dir / use-VOICE_DIGEST_INPUT_DIR next step even though `error_message` itself is still just `morning_job failed with exit code 1`.
+- Learned: the dispatcher already knew the upstream drop was empty, but `next_action` was over-trusting the subprocess error string; using the local input diagnostics makes the morning handoff more robust when stderr gets summarized or wrapped.
+- Next step: wire the real upstream digest path (or populate `incoming_digests/`) and the real OpenClaw/Signal destination, rerun `python3 scripts/voice_digest_dispatch_job.py --check-setup`, then repeat the intended-config `--send --openclaw-dry-run` before one true live delivery.
+
+### 2026-03-29
+- Daytime verifier checkpoint after the earlier morning-job/notifier work: the repo is still clean on `main`, and `python3 -m unittest discover -s tests -p 'test_*.py'` passed again (39 tests), so there is no obvious repo-side regression hiding behind the handoff docs.
+- A live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run is still blocked for the same real-environment reasons the status docs describe: the default `incoming_digests/` drop has no fresh `*.txt` input here, and the notifier destination is still unwired (`.voice_digest_notifier.json` absent, no destination env vars set) even though payload/handoff artifacts and the `openclaw` CLI are present.
+- Stopped without broadening scope because the next real milestone is still environment wiring plus the intended-config dry run, not another repo-only code tweak.
+- Next step: point the scheduler at the real upstream digest path (or populate `incoming_digests/`), add the real OpenClaw/Signal destination via env or local config, rerun `python3 scripts/voice_digest_dispatch_job.py --check-setup`, then repeat the intended-config `--send --openclaw-dry-run` before one true live delivery.
+
+
+### 2026-03-29
 - Tightened the scheduler-failure handoff so `scripts/voice_digest_dispatch_job.py` now preserves `delivery_target` and `delivery_target_ready` inside the downstream notifier snapshot it records after an upstream morning-job failure, instead of dropping those fields even though the notifier already computed them.
 - Added regression coverage in `tests/test_voice_digest_dispatch_job.py` so `delivery_status.json` / `delivery_status.txt` keep showing whether the referenced audio/dry-run artifact itself exists when the dispatch job dies before the notifier stage.
 - Verification passed in three layers: `python3 -m py_compile scripts/voice_digest_dispatch_job.py tests/test_voice_digest_dispatch_job.py` succeeded, `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (20 tests), and the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (39 tests).

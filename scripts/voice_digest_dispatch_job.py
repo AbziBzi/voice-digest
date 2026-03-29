@@ -415,17 +415,23 @@ def derive_next_action(status: dict[str, Any]) -> str | None:
 
     if status.get("status") == "failed":
         if error.get("stage") == "morning_job":
+            rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
+            input_dir_exists = dispatch.get("input_dir_exists")
+            input_match_count = dispatch.get("input_match_count")
+            missing_or_empty_input_drop = (
+                input_dir_exists is False
+                or (isinstance(input_match_count, int) and input_match_count == 0)
+            )
             if (
                 "no digest files matched" in detail_text
                 or "no matching digest files found" in detail_text
                 or "input directory" in detail_text
+                or missing_or_empty_input_drop
             ):
-                rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
                 return (
                     f"Populate {input_dir_display} with a fresh digest text file or point the dispatch job at the real "
                     f"upstream drop via --input-dir / VOICE_DIGEST_INPUT_DIR, then rerun {rerun_target}."
                 )
-            rerun_target = "--check-setup" if dispatch.get("check_setup") else "the dispatch job"
             return f"Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun {rerun_target}."
 
         missing_destination = not any(
