@@ -11,6 +11,13 @@ Use this file as the handoff log for the overnight voice-digest R&D track.
 ## Entries
 
 ### 2026-03-29
+- Added upstream-drop diagnostics to the scheduler-facing status artifact: `scripts/voice_digest_dispatch_job.py` now records the resolved `input_glob`, whether the input directory exists, how many matching digest files were present, and the newest matching candidate path before invoking the morning job.
+- Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for both the new input-drop diagnostic helper and the morning-job failure path, so `delivery_status.*` keeps showing what the dispatcher actually saw when the run dies before notifier setup.
+- Verification passed in two layers: `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (16 tests), and the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (34 tests).
+- Learned: once the remaining blocker is environment wiring, it matters whether the scheduler saw “wrong directory,” “empty directory,” or “at least one candidate before a later failure”; preserving that distinction inside `delivery_status.*` makes the morning handoff more actionable.
+- Next step: use the richer `delivery_status.*` output in the intended environment to confirm whether the real upstream digest drop is being populated as expected, then keep pushing toward the first intended-config `--send --openclaw-dry-run` and true live delivery.
+
+### 2026-03-29
 - Tightened the top-level missing-input handoff: `scripts/voice_digest_dispatch_job.py --check-setup` now recognizes the real `no matching digest files found` morning-job error and writes a concrete `next_action` that points straight at populating `incoming_digests/` or setting `--input-dir` / `VOICE_DIGEST_INPUT_DIR`.
 - Added regression coverage in `tests/test_voice_digest_dispatch_job.py` for that exact empty-drop stderr shape so the morning status artifact keeps the actionable guidance even if the top-level run dies before notifier setup.
 - Verification passed in three layers: `python3 -m unittest tests.test_voice_digest_dispatch_job` passed (14 tests), the full `python3 -m unittest discover -s tests -p 'test_*.py'` suite passed (32 tests), and a live `python3 scripts/voice_digest_dispatch_job.py --check-setup` run now writes `out/delivery_status.txt` with the explicit populate-input-dir / use-VOICE_DIGEST_INPUT_DIR next step.

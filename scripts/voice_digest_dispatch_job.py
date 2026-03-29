@@ -204,6 +204,24 @@ def resolve_input_dir(args: argparse.Namespace) -> tuple[Path, str]:
     return DEFAULT_INPUT_DIR, "default"
 
 
+def collect_input_dir_diagnostics(input_dir: Path, glob_pattern: str) -> dict[str, Any]:
+    resolved = input_dir.resolve()
+    diagnostics: dict[str, Any] = {
+        "input_glob": glob_pattern,
+        "input_dir_exists": resolved.is_dir(),
+        "input_match_count": 0,
+    }
+    if not diagnostics["input_dir_exists"]:
+        return diagnostics
+
+    candidates = sorted(path for path in resolved.glob(glob_pattern) if path.is_file())
+    diagnostics["input_match_count"] = len(candidates)
+    if candidates:
+        newest = max(candidates, key=lambda path: (path.stat().st_mtime_ns, str(path)))
+        diagnostics["newest_matching_input"] = str(newest)
+    return diagnostics
+
+
 def build_morning_job_command(args: argparse.Namespace, input_dir: Path) -> list[str]:
     command = [
         sys.executable,
@@ -514,6 +532,10 @@ def render_status_text(status: dict[str, Any]) -> str:
         max_age_minutes = dispatch.get("max_age_minutes")
         input_dir = dispatch.get("input_dir")
         input_dir_source = dispatch.get("input_dir_source")
+        input_glob = dispatch.get("input_glob")
+        input_dir_exists = dispatch.get("input_dir_exists")
+        input_match_count = dispatch.get("input_match_count")
+        newest_matching_input = dispatch.get("newest_matching_input")
         requested_mode = dispatch.get("requested_audio_message_mode")
         resolved_mode = dispatch.get("resolved_audio_message_mode")
         resolved_mode_source = dispatch.get("audio_message_mode_source")
@@ -528,6 +550,14 @@ def render_status_text(status: dict[str, Any]) -> str:
             lines.append(f"input_dir: {input_dir}")
         if input_dir_source:
             lines.append(f"input_dir_source: {input_dir_source}")
+        if input_glob:
+            lines.append(f"input_glob: {input_glob}")
+        if input_dir_exists is not None:
+            lines.append(f"input_dir_exists: {input_dir_exists}")
+        if input_match_count is not None:
+            lines.append(f"input_match_count: {input_match_count}")
+        if newest_matching_input:
+            lines.append(f"newest_matching_input: {newest_matching_input}")
         if max_age_minutes is not None:
             lines.append(f"max_age_minutes: {max_age_minutes}")
         if requested_mode:
@@ -627,6 +657,7 @@ def build_base_status(
     *,
     input_dir: Path,
     input_dir_source: str,
+    input_diagnostics: dict[str, Any],
 ) -> dict[str, Any]:
     return {
         "status": "running",
@@ -649,6 +680,10 @@ def build_base_status(
             "tts_dry_run": args.dry_run,
             "input_dir": str(input_dir),
             "input_dir_source": input_dir_source,
+            "input_glob": input_diagnostics.get("input_glob"),
+            "input_dir_exists": input_diagnostics.get("input_dir_exists"),
+            "input_match_count": input_diagnostics.get("input_match_count"),
+            "newest_matching_input": input_diagnostics.get("newest_matching_input"),
             "max_age_minutes": args.max_age_minutes,
             "requested_audio_message_mode": args.audio_message_mode,
         },
@@ -680,11 +715,13 @@ def main() -> int:
         ensure_parent(path)
 
     input_dir, input_dir_source = resolve_input_dir(args)
+    input_diagnostics = collect_input_dir_diagnostics(input_dir, args.glob)
     status = build_base_status(
         args,
         started_at,
         input_dir=input_dir,
         input_dir_source=input_dir_source,
+        input_diagnostics=input_diagnostics,
     )
 
     morning_command = build_morning_job_command(args, input_dir)

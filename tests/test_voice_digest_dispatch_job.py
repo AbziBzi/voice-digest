@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import tempfile
 import unittest
 from argparse import Namespace
@@ -74,6 +75,26 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
         self.assertEqual(summary["message"], "notifier_send failed with exit code 9")
         self.assertEqual(summary["detail"], "gateway unavailable")
         self.assertEqual(summary["returncode"], 1)
+
+    def test_collect_input_dir_diagnostics_reports_match_count_and_newest_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = Path(tmpdir) / "incoming"
+            input_dir.mkdir()
+            older = input_dir / "older.txt"
+            newer = input_dir / "newer.txt"
+            ignored = input_dir / "notes.md"
+            older.write_text("older\n", encoding="utf-8")
+            newer.write_text("newer\n", encoding="utf-8")
+            ignored.write_text("ignored\n", encoding="utf-8")
+            os.utime(older, (1_700_000_000, 1_700_000_000))
+            os.utime(newer, (1_700_000_100, 1_700_000_100))
+
+            diagnostics = module.collect_input_dir_diagnostics(input_dir, "*.txt")
+
+        self.assertEqual(diagnostics["input_glob"], "*.txt")
+        self.assertEqual(diagnostics["input_dir_exists"], True)
+        self.assertEqual(diagnostics["input_match_count"], 2)
+        self.assertEqual(diagnostics["newest_matching_input"], str(newer.resolve()))
 
     def test_main_writes_structured_notifier_failure_into_status_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -656,6 +677,67 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             status_text = args.status_text_path.read_text(encoding="utf-8")
             self.assertIn("config_load_error:", status_text)
             self.assertIn("next_action: Fix the malformed .voice_digest_notifier.json", status_text)
+
+    def test_main_preserves_input_drop_diagnostics_when_morning_job_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            input_dir = tmp / "incoming_digests"
+            input_dir.mkdir()
+            digest = input_dir / "digest.txt"
+            digest.write_text("hello\n", encoding="utf-8")
+            args = Namespace(
+                input_dir=input_dir,
+                glob="*.txt",
+                runs_dir=tmp / "out" / "runs",
+                state_path=tmp / "out" / "latest_run.json",
+                handoff_text_path=tmp / "out" / "morning_handoff.txt",
+                handoff_json_path=tmp / "out" / "morning_handoff.json",
+                payload_json_path=tmp / "out" / "delivery_payload.json",
+                status_json_path=tmp / "out" / "delivery_status.json",
+                status_text_path=tmp / "out" / "delivery_status.txt",
+                run_id=None,
+                intro=None,
+                outro=None,
+                voice_id=None,
+                model_id=None,
+                dry_run=False,
+                max_age_minutes=None,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode=None,
+                check_setup=False,
+                send=False,
+                openclaw_dry_run=False,
+            )
+            morning_result = CompletedProcess(
+                args=["python3", "morning"],
+                returncode=1,
+                stdout="",
+                stderr="error: upstream bundler failed\n",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module,
+                "run_command",
+                return_value=morning_result,
+            ), mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+                "sys.stderr", new_callable=io.StringIO
+            ):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            status = json.loads(args.status_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["dispatch"]["input_glob"], "*.txt")
+            self.assertEqual(status["dispatch"]["input_dir_exists"], True)
+            self.assertEqual(status["dispatch"]["input_match_count"], 1)
+            self.assertEqual(status["dispatch"]["newest_matching_input"], str(digest.resolve()))
+
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("input_glob: *.txt", status_text)
+            self.assertIn("input_dir_exists: True", status_text)
+            self.assertIn("input_match_count: 1", status_text)
+            self.assertIn(f"newest_matching_input: {digest.resolve()}", status_text)
 
     def test_derive_next_action_flags_missing_input_drop(self) -> None:
         status = {
