@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -122,6 +123,30 @@ def load_text(path: Path) -> str:
     if not text:
         raise ValueError(f"{path} is empty")
     return text
+
+
+def age_minutes_from(timestamp: datetime) -> float:
+    return round((datetime.now(timezone.utc) - timestamp).total_seconds() / 60, 1)
+
+
+def describe_artifact(path: Path) -> dict[str, object]:
+    details: dict[str, object] = {
+        "path": str(path),
+        "exists": path.is_file(),
+    }
+    if not path.is_file():
+        return details
+
+    stat = path.stat()
+    modified_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+    details.update(
+        {
+            "size_bytes": stat.st_size,
+            "modified_at": modified_at.isoformat(),
+            "age_minutes": age_minutes_from(modified_at),
+        }
+    )
+    return details
 
 
 def build_destination_diagnostics(
@@ -389,6 +414,8 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
     diagnostics: dict[str, object] | None = None
     payload_ready = False
     handoff_ready = False
+    payload_details = describe_artifact(args.payload_path)
+    handoff_text_details = describe_artifact(args.handoff_text_path)
     delivery_target_ready = False
     delivery_target: str | None = None
     delivery_target_error: str | None = None
@@ -487,6 +514,8 @@ def build_setup_report(args: argparse.Namespace) -> dict[str, object]:
         "ready": ready,
         "payload_ready": payload_ready,
         "handoff_ready": handoff_ready,
+        "payload_details": payload_details,
+        "handoff_text_details": handoff_text_details,
         "delivery_target_ready": delivery_target_ready,
         "openclaw_available": openclaw_available,
         "diagnostics": diagnostics,
@@ -534,6 +563,22 @@ def render_setup_report_text(report: dict[str, object]) -> str:
         lines.append(f"target: {report['target']}")
     if "delivery_target" in report:
         lines.append(f"delivery_target: {report['delivery_target']}")
+    payload_details = report.get("payload_details")
+    if isinstance(payload_details, dict):
+        if "path" in payload_details:
+            lines.append(f"payload_path: {payload_details['path']}")
+        if "modified_at" in payload_details:
+            lines.append(f"payload_modified_at: {payload_details['modified_at']}")
+        if "age_minutes" in payload_details:
+            lines.append(f"payload_age_minutes: {payload_details['age_minutes']}")
+    handoff_text_details = report.get("handoff_text_details")
+    if isinstance(handoff_text_details, dict):
+        if "path" in handoff_text_details:
+            lines.append(f"handoff_text_path: {handoff_text_details['path']}")
+        if "modified_at" in handoff_text_details:
+            lines.append(f"handoff_text_modified_at: {handoff_text_details['modified_at']}")
+        if "age_minutes" in handoff_text_details:
+            lines.append(f"handoff_text_age_minutes: {handoff_text_details['age_minutes']}")
     if "destination_source" in report:
         lines.append(f"destination_source: {report['destination_source']}")
     if "requested_audio_message_mode" in report:

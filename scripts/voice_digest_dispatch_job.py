@@ -642,6 +642,22 @@ def render_status_text(status: dict[str, Any]) -> str:
             value = downstream_notifier_check.get(key)
             if value is not None:
                 lines.append(f"  {key}: {value}")
+        payload_details = downstream_notifier_check.get("payload_details")
+        if isinstance(payload_details, dict):
+            if payload_details.get("path"):
+                lines.append(f"  payload_path: {payload_details['path']}")
+            if payload_details.get("modified_at"):
+                lines.append(f"  payload_modified_at: {payload_details['modified_at']}")
+            if payload_details.get("age_minutes") is not None:
+                lines.append(f"  payload_age_minutes: {payload_details['age_minutes']}")
+        handoff_text_details = downstream_notifier_check.get("handoff_text_details")
+        if isinstance(handoff_text_details, dict):
+            if handoff_text_details.get("path"):
+                lines.append(f"  handoff_text_path: {handoff_text_details['path']}")
+            if handoff_text_details.get("modified_at"):
+                lines.append(f"  handoff_text_modified_at: {handoff_text_details['modified_at']}")
+            if handoff_text_details.get("age_minutes") is not None:
+                lines.append(f"  handoff_text_age_minutes: {handoff_text_details['age_minutes']}")
         blockers = downstream_notifier_check.get("blockers")
         if isinstance(blockers, list):
             for blocker in blockers:
@@ -834,6 +850,8 @@ def main() -> int:
                     "audio_message_mode_source": downstream_notifier_json.get("audio_message_mode_source"),
                     "payload_ready": downstream_notifier_json.get("payload_ready"),
                     "handoff_ready": downstream_notifier_json.get("handoff_ready"),
+                    "payload_details": downstream_notifier_json.get("payload_details"),
+                    "handoff_text_details": downstream_notifier_json.get("handoff_text_details"),
                     "delivery_target_ready": downstream_notifier_json.get("delivery_target_ready"),
                     "openclaw_available": downstream_notifier_json.get("openclaw_available"),
                     "blockers": downstream_notifier_json.get("blockers"),

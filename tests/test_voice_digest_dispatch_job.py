@@ -177,6 +177,16 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 "audio_message_mode_source": "config",
                 "payload_ready": True,
                 "handoff_ready": True,
+                "payload_details": {
+                    "path": str(tmp / "out" / "delivery_payload.json"),
+                    "modified_at": "2026-03-29T17:15:00+00:00",
+                    "age_minutes": 15.0,
+                },
+                "handoff_text_details": {
+                    "path": str(tmp / "out" / "morning_handoff.txt"),
+                    "modified_at": "2026-03-29T17:15:30+00:00",
+                    "age_minutes": 14.5,
+                },
                 "delivery_target_ready": False,
                 "openclaw_available": True,
                 "blockers": ["delivery target is missing: /tmp/out/runs/digest.mp3"],
@@ -222,6 +232,14 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
                 True,
             )
             self.assertEqual(
+                status["downstream_notifier_check"]["payload_details"]["path"],
+                str(tmp / "out" / "delivery_payload.json"),
+            )
+            self.assertEqual(
+                status["downstream_notifier_check"]["handoff_text_details"]["path"],
+                str(tmp / "out" / "morning_handoff.txt"),
+            )
+            self.assertEqual(
                 status["downstream_notifier_check"]["delivery_target_ready"],
                 False,
             )
@@ -239,6 +257,10 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
             self.assertIn("  status: blocked", status_text)
             self.assertIn(f"  delivery_target: {tmp / 'out' / 'runs' / 'digest.mp3'}", status_text)
             self.assertIn("  payload_ready: True", status_text)
+            self.assertIn(f"  payload_path: {tmp / 'out' / 'delivery_payload.json'}", status_text)
+            self.assertIn("  payload_age_minutes: 15.0", status_text)
+            self.assertIn(f"  handoff_text_path: {tmp / 'out' / 'morning_handoff.txt'}", status_text)
+            self.assertIn("  handoff_text_age_minutes: 14.5", status_text)
             self.assertIn("  delivery_target_ready: False", status_text)
             self.assertIn("  blocker: delivery target is missing: /tmp/out/runs/digest.mp3", status_text)
 
