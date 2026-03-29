@@ -285,6 +285,27 @@ def build_notifier_command(args: argparse.Namespace) -> list[str]:
     return command
 
 
+def build_notifier_check_setup_command(args: argparse.Namespace) -> list[str]:
+    command = build_notifier_command(args)
+    if "--send" in command:
+        command.remove("--send")
+    if "--openclaw-dry-run" in command:
+        command.remove("--openclaw-dry-run")
+    if "--check-setup" not in command:
+        command.append("--check-setup")
+    return command
+
+
+def parse_optional_json_object(text: str) -> dict[str, Any] | None:
+    if not text.strip():
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def extract_error_summary(*texts: str) -> str | None:
     for text in texts:
         if not text:
@@ -309,12 +330,20 @@ def summarize_command_failure(
     parsed_json: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     message = f"{stage} failed with exit code {result.returncode}"
-    detail = extract_error_summary(result.stderr, result.stdout)
+    detail = None
 
     if isinstance(parsed_json, dict):
         json_error = parsed_json.get("error")
         if isinstance(json_error, str) and json_error.strip():
             detail = json_error.strip()
+        destination_error = parsed_json.get("destination_error")
+        if not detail and isinstance(destination_error, str) and destination_error.strip():
+            detail = destination_error.strip()
+        blockers = parsed_json.get("blockers")
+        if not detail and isinstance(blockers, list):
+            blocker_text = "; ".join(str(blocker).strip() for blocker in blockers if str(blocker).strip())
+            if blocker_text:
+                detail = blocker_text
         json_returncode = parsed_json.get("returncode")
         if isinstance(json_returncode, int):
             message = f"{stage} failed with exit code {json_returncode}"
@@ -582,6 +611,37 @@ def render_status_text(status: dict[str, Any]) -> str:
             for blocker in setup_blockers:
                 lines.append(f"setup_blocker: {blocker}")
 
+    downstream_notifier_check = status.get("downstream_notifier_check")
+    if isinstance(downstream_notifier_check, dict):
+        lines.append("downstream_notifier_check:")
+        for key in (
+            "status",
+            "channel",
+            "target",
+            "destination_source",
+            "requested_audio_message_mode",
+            "audio_message_mode",
+            "audio_message_mode_source",
+            "payload_ready",
+            "handoff_ready",
+            "openclaw_available",
+        ):
+            value = downstream_notifier_check.get(key)
+            if value is not None:
+                lines.append(f"  {key}: {value}")
+        blockers = downstream_notifier_check.get("blockers")
+        if isinstance(blockers, list):
+            for blocker in blockers:
+                lines.append(f"  blocker: {blocker}")
+        probe_error = downstream_notifier_check.get("probe_error")
+        if isinstance(probe_error, dict):
+            lines.append(f"  probe_error_stage: {probe_error.get('stage')}")
+            probe_detail = probe_error.get("detail")
+            if probe_detail:
+                lines.append("  probe_error_detail:")
+                for line in str(probe_detail).splitlines():
+                    lines.append(f"    {line}")
+
     error = status.get("error")
     if isinstance(error, dict):
         lines.append(f"error_stage: {error.get('stage')}")
@@ -737,6 +797,48 @@ def main() -> int:
     if morning_result.returncode != 0:
         status["status"] = "failed"
         status["error"] = summarize_command_failure(morning_result, "morning_job")
+
+        downstream_notifier_result: subprocess.CompletedProcess[str] | None = None
+        if args.check_setup:
+            downstream_notifier_command = build_notifier_check_setup_command(args)
+            status["commands"]["downstream_notifier_check"] = command_preview(downstream_notifier_command)
+            downstream_notifier_result = run_command(downstream_notifier_command)
+            status["downstream_notifier"] = {
+                "returncode": downstream_notifier_result.returncode,
+                "stdout": clip_output(downstream_notifier_result.stdout),
+                "stderr": clip_output(downstream_notifier_result.stderr),
+            }
+            downstream_notifier_json = parse_optional_json_object(downstream_notifier_result.stdout)
+            if downstream_notifier_json:
+                downstream_summary = {
+                    "status": downstream_notifier_json.get("status"),
+                    "channel": downstream_notifier_json.get("channel"),
+                    "target": downstream_notifier_json.get("target"),
+                    "destination_source": downstream_notifier_json.get("destination_source"),
+                    "requested_audio_message_mode": downstream_notifier_json.get("requested_audio_message_mode"),
+                    "audio_message_mode": downstream_notifier_json.get("audio_message_mode"),
+                    "audio_message_mode_source": downstream_notifier_json.get("audio_message_mode_source"),
+                    "payload_ready": downstream_notifier_json.get("payload_ready"),
+                    "handoff_ready": downstream_notifier_json.get("handoff_ready"),
+                    "openclaw_available": downstream_notifier_json.get("openclaw_available"),
+                    "blockers": downstream_notifier_json.get("blockers"),
+                }
+                if downstream_notifier_result.returncode != 0:
+                    downstream_summary["probe_error"] = summarize_command_failure(
+                        downstream_notifier_result,
+                        "downstream_notifier_check",
+                        parsed_json=downstream_notifier_json,
+                    )
+                status["downstream_notifier_check"] = downstream_summary
+            elif downstream_notifier_result.returncode != 0:
+                status["downstream_notifier_check"] = {
+                    "status": "error",
+                    "probe_error": summarize_command_failure(
+                        downstream_notifier_result,
+                        "downstream_notifier_check",
+                    ),
+                }
+
         status["next_action"] = derive_next_action(status)
         finalize_status(status, iso_now(), started_at_dt)
         write_status(status, args.status_json_path, args.status_text_path)
@@ -744,6 +846,11 @@ def main() -> int:
             sys.stdout.write(morning_result.stdout)
         if morning_result.stderr:
             sys.stderr.write(morning_result.stderr)
+        if downstream_notifier_result is not None:
+            if downstream_notifier_result.stdout:
+                sys.stdout.write(downstream_notifier_result.stdout)
+            if downstream_notifier_result.stderr:
+                sys.stderr.write(downstream_notifier_result.stderr)
         print(f"delivery status json: {args.status_json_path}")
         print(f"delivery status text: {args.status_text_path}")
         return 1
@@ -789,14 +896,7 @@ def main() -> int:
             "delivery_target_details": delivery_target_details if isinstance(delivery_target_details, dict) else None,
         }
 
-    notifier_json: dict[str, Any] | None = None
-    if notifier_result.stdout.strip():
-        try:
-            parsed = json.loads(notifier_result.stdout)
-            if isinstance(parsed, dict):
-                notifier_json = parsed
-        except json.JSONDecodeError:
-            notifier_json = None
+    notifier_json = parse_optional_json_object(notifier_result.stdout)
 
     if notifier_json:
         status["notifier_result"] = notifier_json

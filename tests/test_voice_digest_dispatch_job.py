@@ -39,6 +39,25 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
         self.assertNotIn("--send", command)
         self.assertNotIn("--openclaw-dry-run", command)
 
+    def test_build_notifier_check_setup_command_rewrites_send_invocation(self) -> None:
+        args = Namespace(
+            payload_json_path=Path("/tmp/delivery_payload.json"),
+            handoff_text_path=Path("/tmp/morning_handoff.txt"),
+            config_path=Path("/tmp/.voice_digest_notifier.json"),
+            channel="signal",
+            target="+37060000000",
+            audio_message_mode="auto",
+            check_setup=False,
+            send=True,
+            openclaw_dry_run=True,
+        )
+
+        command = module.build_notifier_check_setup_command(args)
+
+        self.assertIn("--check-setup", command)
+        self.assertNotIn("--send", command)
+        self.assertNotIn("--openclaw-dry-run", command)
+
     def test_resolve_input_dir_prefers_cli_then_env_then_default(self) -> None:
         cli_args = Namespace(input_dir=Path("/tmp/cli-digests"))
         self.assertEqual(
@@ -76,6 +95,20 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
         self.assertEqual(summary["detail"], "gateway unavailable")
         self.assertEqual(summary["returncode"], 1)
 
+    def test_summarize_command_failure_falls_back_to_structured_blockers(self) -> None:
+        result = CompletedProcess(
+            args=["python3", "notifier", "--check-setup"],
+            returncode=1,
+            stdout='{"status": "blocked", "blockers": ["destination missing"]}',
+            stderr="",
+        )
+        summary = module.summarize_command_failure(
+            result,
+            "downstream_notifier_check",
+            parsed_json={"status": "blocked", "blockers": ["destination missing"]},
+        )
+        self.assertEqual(summary["detail"], "destination missing")
+
     def test_collect_input_dir_diagnostics_reports_match_count_and_newest_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             input_dir = Path(tmpdir) / "incoming"
@@ -95,6 +128,107 @@ class VoiceDigestDispatchJobTests(unittest.TestCase):
         self.assertEqual(diagnostics["input_dir_exists"], True)
         self.assertEqual(diagnostics["input_match_count"], 2)
         self.assertEqual(diagnostics["newest_matching_input"], str(newer.resolve()))
+
+    def test_main_check_setup_preserves_downstream_notifier_snapshot_when_morning_job_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            args = Namespace(
+                input_dir=None,
+                glob="*.txt",
+                runs_dir=tmp / "out" / "runs",
+                state_path=tmp / "out" / "latest_run.json",
+                handoff_text_path=tmp / "out" / "morning_handoff.txt",
+                handoff_json_path=tmp / "out" / "morning_handoff.json",
+                payload_json_path=tmp / "out" / "delivery_payload.json",
+                status_json_path=tmp / "out" / "delivery_status.json",
+                status_text_path=tmp / "out" / "delivery_status.txt",
+                run_id=None,
+                intro=None,
+                outro=None,
+                voice_id=None,
+                model_id=None,
+                dry_run=False,
+                max_age_minutes=None,
+                channel=None,
+                target=None,
+                config_path=tmp / ".voice_digest_notifier.json",
+                audio_message_mode="auto",
+                check_setup=True,
+                send=False,
+                openclaw_dry_run=False,
+            )
+
+            morning_result = CompletedProcess(
+                args=["python3", "morning"],
+                returncode=1,
+                stdout="",
+                stderr=(
+                    "error: no matching digest files found in /tmp/incoming for glob '*.txt'\n"
+                ),
+            )
+            notifier_probe = {
+                "status": "blocked",
+                "channel": "signal",
+                "target": "+37060000000",
+                "destination_source": "config",
+                "requested_audio_message_mode": "auto",
+                "audio_message_mode": "caption",
+                "audio_message_mode_source": "config",
+                "payload_ready": True,
+                "handoff_ready": True,
+                "openclaw_available": True,
+                "blockers": ["destination is not configured"],
+            }
+            notifier_result = CompletedProcess(
+                args=["python3", "notifier", "--check-setup"],
+                returncode=1,
+                stdout=json.dumps(notifier_probe),
+                stderr="",
+            )
+
+            with mock.patch.object(module, "parse_args", return_value=args), mock.patch.object(
+                module,
+                "run_command",
+                side_effect=[morning_result, notifier_result],
+            ), mock.patch("sys.stdout", new_callable=io.StringIO), mock.patch(
+                "sys.stderr", new_callable=io.StringIO
+            ):
+                exit_code = module.main()
+
+            self.assertEqual(exit_code, 1)
+            status = json.loads(args.status_json_path.read_text(encoding="utf-8"))
+            self.assertEqual(status["status"], "failed")
+            self.assertEqual(status["error"]["stage"], "morning_job")
+            self.assertEqual(
+                status["downstream_notifier_check"]["status"],
+                "blocked",
+            )
+            self.assertEqual(
+                status["downstream_notifier_check"]["channel"],
+                "signal",
+            )
+            self.assertEqual(
+                status["downstream_notifier_check"]["audio_message_mode"],
+                "caption",
+            )
+            self.assertEqual(
+                status["downstream_notifier_check"]["payload_ready"],
+                True,
+            )
+            self.assertEqual(
+                status["commands"]["downstream_notifier_check"].endswith("--check-setup"),
+                True,
+            )
+            self.assertEqual(
+                status["next_action"],
+                "Inspect the morning-job error detail, fix the upstream artifact generation issue, then rerun --check-setup.",
+            )
+
+            status_text = args.status_text_path.read_text(encoding="utf-8")
+            self.assertIn("downstream_notifier_check:", status_text)
+            self.assertIn("  status: blocked", status_text)
+            self.assertIn("  payload_ready: True", status_text)
+            self.assertIn("  blocker: destination is not configured", status_text)
 
     def test_main_writes_structured_notifier_failure_into_status_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
